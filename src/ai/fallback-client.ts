@@ -6,7 +6,7 @@ import { OpencodeClient } from "./opencode-client.ts";
 
 export interface FallbackClientConfig {
   ollama: { apiKey?: string; host?: string; model?: string; supportsVision?: boolean; thinking?: boolean };
-  opencode?: { model?: string; hostname?: string; port?: number };
+  opencode?: { model?: string; baseUrl?: string; apiKey?: string };
 }
 
 export class FallbackClient implements AIClient {

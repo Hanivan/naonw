@@ -10,7 +10,7 @@ const BLUE = "\x1b[34m";
 const GRAY = "\x1b[90m";
 
 function timestamp(): string {
-  return `${GRAY}${new Date().toISOString().slice(11, 23)}${RESET}`;
+  return `${GRAY}${new Date().toISOString().slice(5, 23).replace("T", " ")}${RESET}`;
 }
 
 function tag(color: string, label: string): string {
@@ -42,6 +42,9 @@ export const log = {
   },
   think(msg: string): void {
     console.log(`${timestamp()} ${tag(MAGENTA, "THINK")} ${DIM}${msg}${RESET}`);
+  },
+  element(detail: string, html: string): void {
+    console.log(`${timestamp()} ${tag(CYAN, "ELEMENT")} ${DIM}${detail}${RESET}\n           ${GRAY}${html}${RESET}`);
   },
   debug(msg: string): void {
     if (process.env.DEBUG) {

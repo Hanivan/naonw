@@ -1,6 +1,7 @@
 import type { Page } from "puppeteer";
 import type { ToolDefinition } from "@/ai/client.ts";
 import { toMessage } from "@/utils/errors.ts";
+import { log } from "@/utils/logger.ts";
 import "@/browser/query.ts";
 
 export const toolDefinitions: ToolDefinition[] = [
@@ -84,6 +85,23 @@ export const toolDefinitions: ToolDefinition[] = [
     },
   },
   {
+    name: "solveCaptcha",
+    description: "Take a screenshot of the reCAPTCHA challenge and extract the challenge description. Use this when a CAPTCHA is visible. Returns a screenshot and the challenge text so you can identify which tiles to select.",
+    parameters: { type: "object", required: [], properties: {} },
+  },
+  {
+    name: "clickCaptchaTile",
+    description: "Click one or more tiles in a reCAPTCHA image challenge by their numeric IDs (0-based, left-to-right top-to-bottom). Set verify=true to click the Verify/Next button after selecting.",
+    parameters: {
+      type: "object",
+      required: ["ids"],
+      properties: {
+        ids: { type: "array", items: { type: "number" }, description: "Tile IDs to click (0–15 for 4×4 grid)" },
+        verify: { type: "boolean", description: "Click the Verify/Next button after selecting tiles" },
+      },
+    },
+  },
+  {
     name: "done",
     description: "Signal that the task is complete",
     parameters: {
@@ -129,7 +147,7 @@ export async function executeTool(
         }, selector);
         if (!info) throw new Error(`Element not found: ${selector}`);
         const detail = [info.tag, info.type && `[${info.type}]`, info.text && `"${info.text}"`, info.href && `→ ${info.href}`].filter(Boolean).join(" ");
-        console.log(`\x1b[90m[DEBUG] click resolved → ${detail}\n         html: ${info.html}\x1b[0m`);
+        log.element(detail, info.html);
         await page.waitForNetworkIdle({ timeout: 5000 }).catch(() => {});
         return { text: `Clicked ${selector}` };
       }
@@ -183,6 +201,36 @@ export async function executeTool(
       case "screenshot": {
         const imageBase64 = await page.screenshot({ encoding: "base64" });
         return { text: "Screenshot taken", imageBase64 };
+      }
+      case "solveCaptcha": {
+        const frames = page.frames();
+        const challengeFrame = frames.find((f) => f.url().includes("recaptcha") && f.url().includes("bframe"));
+        const challengeText = challengeFrame
+          ? await challengeFrame.evaluate(() => {
+              const el = document.querySelector(".rc-imageselect-desc-no-canonical, .rc-imageselect-desc");
+              return el?.textContent?.trim() ?? "";
+            }).catch(() => "")
+          : "";
+        const imageBase64 = await page.screenshot({ encoding: "base64" });
+        return {
+          text: `CAPTCHA challenge: "${challengeText}". Grid is 4×4 (IDs 0–15, left-to-right top-to-bottom). Call clickCaptchaTile with IDs of matching tiles, then verify=true when done.`,
+          imageBase64,
+        };
+      }
+      case "clickCaptchaTile": {
+        const ids = args.ids as number[];
+        const frames = page.frames();
+        const challengeFrame = frames.find((f) => f.url().includes("recaptcha") && f.url().includes("bframe"));
+        if (!challengeFrame) throw new Error("reCAPTCHA challenge frame not found");
+        for (const id of ids) {
+          await challengeFrame.click(`#${id}`).catch(() => {});
+          await Bun.sleep(150);
+        }
+        if (args.verify) {
+          await Bun.sleep(400);
+          await challengeFrame.click("#recaptcha-verify-button").catch(() => {});
+        }
+        return { text: `Clicked CAPTCHA tiles [${ids.join(", ")}]${args.verify ? " and submitted" : ""}` };
       }
       case "done": {
         return { text: `DONE: ${args.summary as string}` };

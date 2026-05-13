@@ -34,7 +34,7 @@ log.info(`  Ollama  : ${ollamaHost} ${isCloud ? "(cloud)" : "(local)"}`);
 log.info(`  Model   : ${ollamaModel}`);
 log.info(`  Vision  : ${ollamaVision ? "enabled (screenshots attached)" : "disabled (screenshots skipped)"}`);
 log.info(`  Thinking: ${ollamaThinking ? "enabled (stream)" : "disabled (non-stream)"}`);
-log.info(`  Fallback: ${process.env.OPENCODE_MODEL ?? "anthropic/claude-sonnet-4-5-20250514"}`);
+log.info(`  Fallback: ${process.env.OPENCODE_MODEL ?? "anthropic/claude-sonnet-4-5-20250514"} @ ${process.env.OPENCODE_HOST ?? "http://127.0.0.1:4096/v1"}`);
 log.info(`  Browser : ${headless ? "headless" : "visible"}`);
 log.info("─────────────────────────────────────────────────");
 
@@ -49,8 +49,8 @@ const ai = new FallbackClient({
   },
   opencode: {
     model: process.env.OPENCODE_MODEL,
-    hostname: process.env.OPENCODE_HOST,
-    port: process.env.OPENCODE_PORT ? parseInt(process.env.OPENCODE_PORT, 10) : undefined,
+    baseUrl: process.env.OPENCODE_HOST,
+    apiKey: process.env.OPENCODE_API_KEY,
   },
 });
 

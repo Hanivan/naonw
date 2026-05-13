@@ -98,6 +98,21 @@ export class OllamaClient implements AIClient {
       }));
     }
 
+    if (process.env.DEBUG) {
+      const dump = this.messages
+        .map((m, i) => {
+          const role = m.tool_name ? `${m.role}(${m.tool_name})` : m.role;
+          const img = m.images?.length ? ` [+${m.images.length} img]` : "";
+          const body = m.content.length > 400 ? `${m.content.slice(0, 400)}…` : m.content;
+          return `  #${i} [${role}]${img} ${body}`;
+        })
+        .join("\n");
+      const toolNames = this.cachedTools?.map((t) => t.function.name).join(", ") ?? "none";
+      process.stdout.write(
+        `\n${ts()} ${GRAY}[DEBUG] → ${this.model} (${this.messages.length} msgs)\n${dump}\n  tools: [${toolNames}]${RESET}\n\n`,
+      );
+    }
+
     if (!this.thinking) {
       const response = await this.ollama.chat({
         model: this.model,

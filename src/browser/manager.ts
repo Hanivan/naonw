@@ -10,7 +10,7 @@ export class BrowserManager {
     this.page = await this.browser.newPage();
     await this.page.setViewport({ width: 1280, height: 720 });
     await this.page.evaluateOnNewDocument(DEEP_QUERY_SCRIPT);
-    await this.page.goto("https://www.google.com");
+    // await this.page.goto("https://www.google.com");
     return this.page;
   }
 

@@ -26,6 +26,7 @@ export async function runAgentLoop(
   ai: AIClient,
   userPrompt: string,
 ): Promise<AgentResult> {
+  ai.clearHistory();
   const supportsVision = process.env.OLLAMA_VISION === "true";
   const activeTools = supportsVision ? toolDefinitions : toolDefinitions.filter((t) => t.name !== "screenshot");
   ai.addSystem(buildSystemPrompt(supportsVision));
@@ -36,8 +37,13 @@ export async function runAgentLoop(
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     if (await detectCaptcha(page)) {
-      log.captcha("Solve it in the browser, then press Enter to continue...");
-      await waitForEnter();
+      if (supportsVision) {
+        log.captcha("CAPTCHA detected — injecting solveCaptcha hint for AI");
+        ai.addUser("CAPTCHA is visible. Call solveCaptcha() to get a screenshot and challenge text, then clickCaptchaTile() to select matching tiles.");
+      } else {
+        log.captcha("Solve it in the browser, then press Enter to continue...");
+        await waitForEnter();
+      }
     }
 
     const dom = await parseDOM(page);
@@ -67,7 +73,9 @@ export async function runAgentLoop(
       log.warn("Dialog/modal detected — modal elements surfaced at top of DOM context");
     }
 
-    ai.addUser(buildDOMContext(dom));
+    const domContext = buildDOMContext(dom);
+    log.debug(`PAGE STATE:\n${domContext}`);
+    ai.addUser(domContext);
 
     log.info("Waiting for AI...");
     const response = await ai.chat(activeTools);
@@ -119,7 +127,7 @@ export async function runAgentLoop(
       log.tool(call.name, call.arguments);
 
       const result = await executeTool(page, call.name, call.arguments);
-      log.result(result.text);
+      if (call.name !== "done") log.result(result.text);
 
       ai.addToolResult(call.name, result.text);
       if (result.imageBase64 && supportsVision) {
