@@ -2,22 +2,27 @@ import type { ChatResult, ToolDefinition } from "@/ai/client.ts";
 import { OAIProvider, type OAIMessage, type OAIToolCall } from "@/ai/provider.ts";
 import { log } from "@/utils/logger.ts";
 
-export interface OpencodeClientConfig {
+export interface OpenRouterClientConfig {
   model?: string;
-  baseUrl?: string;
   apiKeys?: string[];
+  siteUrl?: string;
+  siteName?: string;
 }
 
-export class OpencodeClient extends OAIProvider {
-  readonly provider = "opencode";
-  private baseUrl: string;
+export class OpenRouterClient extends OAIProvider {
+  readonly provider = "openrouter";
+  private readonly baseUrl = "https://openrouter.ai/api/v1";
+  private readonly extraHeaders: Record<string, string>;
 
-  constructor(config: OpencodeClientConfig = {}) {
+  constructor(config: OpenRouterClientConfig = {}) {
     super(
-      config.model ?? "minimax-m2.5",
-      config.apiKeys?.filter(Boolean) ?? ["opencode"],
+      config.model ?? "openrouter/owl-alpha",
+      config.apiKeys?.filter(Boolean) ?? [],
     );
-    this.baseUrl = (config.baseUrl ?? "http://127.0.0.1:4096/v1").replace(/\/$/, "");
+    this.extraHeaders = {
+      ...(config.siteUrl ? { "HTTP-Referer": config.siteUrl } : {}),
+      ...(config.siteName ? { "X-Title": config.siteName } : {}),
+    };
   }
 
   protected async doChat(messages: OAIMessage[], tools: ToolDefinition[]): Promise<ChatResult> {
@@ -27,19 +32,23 @@ export class OpencodeClient extends OAIProvider {
     }));
 
     if (process.env.DEBUG) {
-      log.debug(`opencode → ${this.baseUrl} model=${this.model} msgs=${messages.length}`);
+      log.debug(`openrouter → model=${this.model} msgs=${messages.length}`);
     }
 
     const body = JSON.stringify({ model: this.model, messages, tools: oaiTools, tool_choice: "auto" });
-    let res!: Response;
     let usedKey = this.nextKey();
-    if (!usedKey) throw new Error("All OpenCode API keys are rate-limited");
+    if (!usedKey) throw new Error("All OpenRouter API keys are rate-limited");
 
+    let res!: Response;
     for (let attempt = 0; attempt <= Math.min(this.apiKeys.length, 3); attempt++) {
       if (attempt > 0) await Bun.sleep(1000 * attempt);
       res = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${usedKey.key}` },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${usedKey.key}`,
+          ...this.extraHeaders,
+        },
         body,
       });
       if (res.status === 429) { this.lockKey(usedKey.index); usedKey = this.nextKey() ?? usedKey; continue; }
@@ -48,7 +57,7 @@ export class OpencodeClient extends OAIProvider {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`OpenCode API ${res.status}: ${text.slice(0, 300)}`);
+      throw new Error(`OpenRouter API ${res.status}: ${text.slice(0, 300)}`);
     }
 
     const data = await res.json() as {
@@ -57,7 +66,7 @@ export class OpencodeClient extends OAIProvider {
     };
 
     if (data.usage) log.token(data.usage.prompt_tokens, data.usage.completion_tokens);
-    if (process.env.DEBUG) log.debug(`opencode response: ${JSON.stringify(data).slice(0, 400)}`);
+    if (process.env.DEBUG) log.debug(`openrouter response: ${JSON.stringify(data).slice(0, 400)}`);
 
     const msg = data.choices?.[0]?.message;
     if (!msg) return { content: null, thinking: null, toolCalls: [], provider: this.provider };

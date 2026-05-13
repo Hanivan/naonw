@@ -1,25 +1,16 @@
-import type {
-  AIClient,
-  ChatResult,
-  ToolCallResult,
-  ToolDefinition,
-} from "@/ai/client.ts";
+import type { ChatResult, ToolCallResult, ToolDefinition } from "@/ai/client.ts";
+import { DirectProvider } from "@/ai/provider.ts";
 import { Ollama, type Message, type Tool } from "ollama";
+import { log, timestamp } from "@/utils/logger.ts";
 
 const RESET = "\x1b[0m";
 const BOLD = "\x1b[1m";
 const DIM = "\x1b[2m";
-const GRAY = "\x1b[90m";
-const CYAN = "\x1b[36m";
 const MAGENTA = "\x1b[35m";
 const BLUE = "\x1b[34m";
 
-function ts(): string {
-  return `${GRAY}${new Date().toISOString().slice(11, 23)}${RESET}`;
-}
-
 export interface OllamaClientConfig {
-  apiKey?: string;
+  apiKeys?: string[];
   host?: string;
   model?: string;
   supportsVision?: boolean;
@@ -33,10 +24,11 @@ type OllamaMessage = {
   images?: string[];
 };
 
-export class OllamaClient implements AIClient {
+export class OllamaClient extends DirectProvider {
   readonly provider = "ollama";
   private ollama: Ollama;
-  private model: string;
+  private host: string;
+  private readonly model: string;
   private supportsVision: boolean;
   private thinking: boolean;
   private messages: OllamaMessage[] = [];
@@ -44,14 +36,15 @@ export class OllamaClient implements AIClient {
   private cachedToolsSource: ToolDefinition[] | null = null;
 
   constructor(config: OllamaClientConfig) {
-    const host = config.host ?? "http://localhost:11434";
+    super(config.apiKeys?.filter(Boolean) ?? []);
+    this.host = (config.host ?? "http://localhost:11434").replace(/\/$/, "");
     this.ollama = new Ollama({
-      host,
-      ...(config.apiKey
-        ? { headers: { Authorization: `Bearer ${config.apiKey}` } }
+      host: this.host,
+      ...(this.apiKeys.length
+        ? { headers: { Authorization: `Bearer ${this.apiKeys[0]}` } }
         : {}),
     });
-    this.model = config.model ?? "qwen3-vl:4b-instruct";
+    this.model = config.model ?? "minimax-m2.5";
     this.supportsVision = config.supportsVision ?? false;
     this.thinking = config.thinking ?? false;
   }
@@ -86,6 +79,14 @@ export class OllamaClient implements AIClient {
   }
 
   async chat(tools: ToolDefinition[]): Promise<ChatResult> {
+    if (this.apiKeys.length) {
+      const entry = this.nextKey();
+      if (!entry) throw new Error("All Ollama API keys are rate-limited");
+      this.ollama = new Ollama({
+        host: this.host,
+        headers: { Authorization: `Bearer ${entry.key}` },
+      });
+    }
     if (tools !== this.cachedToolsSource) {
       this.cachedToolsSource = tools;
       this.cachedTools = tools.map((t) => ({
@@ -108,20 +109,47 @@ export class OllamaClient implements AIClient {
         })
         .join("\n");
       const toolNames = this.cachedTools?.map((t) => t.function.name).join(", ") ?? "none";
-      process.stdout.write(
-        `\n${ts()} ${GRAY}[DEBUG] → ${this.model} (${this.messages.length} msgs)\n${dump}\n  tools: [${toolNames}]${RESET}\n\n`,
-      );
+      log.debug(`→ ${this.model} (${this.messages.length} msgs)\n${dump}\n  tools: [${toolNames}]`);
     }
 
     if (!this.thinking) {
-      const response = await this.ollama.chat({
-        model: this.model,
-        messages: this.messages,
-        tools: this.cachedTools!,
-        think: this.thinking,
-      });
+      let response;
+      try {
+        response = await this.ollama.chat({
+          model: this.model,
+          messages: this.messages,
+          tools: this.cachedTools!,
+          think: this.thinking,
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("429") || msg.includes("rate") || msg.includes("limit")) {
+          if (this.apiKeys.length) {
+            const entry = this.nextKey();
+            if (entry) {
+              this.lockKey(entry.index);
+              this.ollama = new Ollama({ host: this.host, headers: { Authorization: `Bearer ${entry.key}` } });
+              response = await this.ollama.chat({
+                model: this.model,
+                messages: this.messages,
+                tools: this.cachedTools!,
+                think: this.thinking,
+              });
+            } else {
+              throw new Error("All Ollama API keys are rate-limited");
+            }
+          } else {
+            throw err;
+          }
+        } else {
+          throw err;
+        }
+      }
       if (process.env.DEBUG) {
-        process.stdout.write(`\n${ts()} ${GRAY}[DEBUG] response (non-stream): ${JSON.stringify(response.message)}${RESET}\n`);
+        log.debug(`response (non-stream): ${JSON.stringify(response.message)}`);
+      }
+      if (response.prompt_eval_count !== undefined || response.eval_count !== undefined) {
+        log.token(response.prompt_eval_count ?? 0, response.eval_count ?? 0);
       }
       const toolCalls: ToolCallResult[] = (response.message?.tool_calls ?? []).map((tc) => ({
         name: tc.function.name,
@@ -129,9 +157,9 @@ export class OllamaClient implements AIClient {
       }));
       const content = response.message?.content ?? null;
       const thinking = (response.message as { thinking?: string }).thinking ?? null;
-      if (thinking && this.thinking) process.stdout.write(`${ts()} ${MAGENTA}${BOLD}[THINK]${RESET} ${DIM}${thinking}${RESET}\n`);
-      if (content) process.stdout.write(`${ts()} ${BLUE}${BOLD}[AGENT]${RESET} ${CYAN}AI:${RESET} ${content}\n`);
-      return { content, thinking, toolCalls, streamed: true };
+      if (thinking && this.thinking) log.think(thinking);
+      if (content) log.agent(`AI: ${content}`);
+      return { content, thinking, toolCalls, streamed: true, provider: "ollama" };
     }
 
     const stream = await this.ollama.chat({
@@ -145,6 +173,8 @@ export class OllamaClient implements AIClient {
     let fullContent = "";
     let fullThinking = "";
     let lastMessage: Message | null = null;
+    let lastPromptEval = 0;
+    let lastEvalCount = 0;
     let printedThinkPrefix = false;
     let printedContentPrefix = false;
     let inThinkTag = false;
@@ -155,6 +185,8 @@ export class OllamaClient implements AIClient {
         firstChunk = false;
       }
       lastMessage = chunk.message;
+      if (chunk.prompt_eval_count) lastPromptEval = chunk.prompt_eval_count;
+      if (chunk.eval_count) lastEvalCount = chunk.eval_count;
       const thinking = (chunk.message as { thinking?: string }).thinking ?? "";
       const content = chunk.message.content ?? "";
 
@@ -162,7 +194,7 @@ export class OllamaClient implements AIClient {
         fullThinking += thinking;
         if (this.thinking) {
           if (!printedThinkPrefix) {
-            process.stdout.write(`${ts()} ${MAGENTA}${BOLD}[THINK]${RESET} ${DIM}`);
+            process.stdout.write(`${timestamp()} ${MAGENTA}${BOLD}[THINK]${RESET} ${DIM}`);
             printedThinkPrefix = true;
           }
           process.stdout.write(thinking);
@@ -195,7 +227,7 @@ export class OllamaClient implements AIClient {
             process.stdout.write(`${RESET}\n`);
           }
           if (!printedContentPrefix) {
-            process.stdout.write(`${ts()} ${BLUE}${BOLD}[AGENT]${RESET} ${CYAN}AI:${RESET} `);
+            process.stdout.write(`${timestamp()} ${BLUE}${BOLD}[AGENT]${RESET} AI: `);
             printedContentPrefix = true;
           }
           process.stdout.write(visible);
@@ -207,10 +239,14 @@ export class OllamaClient implements AIClient {
       process.stdout.write(`${RESET}\n`);
     }
 
+    if (lastPromptEval || lastEvalCount) {
+      log.token(lastPromptEval, lastEvalCount);
+    }
+
     fullContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
     if (process.env.DEBUG) {
-      process.stdout.write(`\n${ts()} ${GRAY}[DEBUG] lastMessage: ${JSON.stringify(lastMessage)}${RESET}\n`);
+      log.debug(`lastMessage: ${JSON.stringify(lastMessage)}`);
     }
 
     const toolCalls: ToolCallResult[] = (
@@ -231,6 +267,7 @@ export class OllamaClient implements AIClient {
       thinking: fullThinking || null,
       toolCalls,
       streamed: true,
+      provider: "ollama",
     };
   }
 }

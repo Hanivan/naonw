@@ -12,8 +12,42 @@ function askPrompt(question: string): Promise<string> {
   });
 }
 
-let initialPrompt = process.argv.slice(2).join(" ").trim();
+function parseKeys(raw: string | undefined): string[] | undefined {
+  if (!raw) return undefined;
+  const keys = raw.split(",").map((k) => k.trim()).filter(Boolean);
+  return keys.length ? keys : undefined;
+}
 
+const ollamaHost = process.env.OLLAMA_HOST ?? "http://localhost:11434";
+const ollamaModel = process.env.OLLAMA_MODEL ?? "minimax-m2.5";
+const supportsVision = process.env.VISION === "true";
+const supportsThinking = process.env.THINKING === "true";
+const headless = process.env.HEADLESS === "true";
+const isCloud = !ollamaHost.includes("localhost") && !ollamaHost.includes("127.0.0.1");
+
+const ollamaKeys = parseKeys(process.env.OLLAMA_API_KEY);
+const opencodeKeys = parseKeys(process.env.OPENCODE_API_KEY);
+
+const openrouterKeys = parseKeys(process.env.OPENROUTER_API_KEY);
+
+const providerChain: string[] = [];
+if (openrouterKeys?.length) {
+  providerChain.push(`openrouter  ${process.env.OPENROUTER_MODEL ?? "openrouter/owl-alpha"} [${openrouterKeys.length} keys]`);
+}
+providerChain.push(`ollama      ${ollamaModel} @ ${ollamaHost} ${isCloud ? "(cloud)" : "(local)"} [${ollamaKeys?.length ?? 0} keys]`);
+if (opencodeKeys?.length) {
+  providerChain.push(`opencode    ${process.env.OPENCODE_MODEL ?? "minimax-m2.5"} @ ${process.env.OPENCODE_HOST ?? "http://127.0.0.1:4096/v1"} [${opencodeKeys.length} keys]`);
+}
+
+log.info("─── Configuration ───────────────────────────────");
+log.info("  Provider chain (priority order):");
+providerChain.forEach((p, i) => log.info(`    ${i + 1}. ${p}`));
+log.info(`  Vision   : ${supportsVision ? "enabled" : "disabled"}`);
+log.info(`  Thinking : ${supportsThinking ? "enabled (stream)" : "disabled (non-stream)"}`);
+log.info(`  Browser  : ${headless ? "headless" : "visible"}`);
+log.info("─────────────────────────────────────────────────");
+
+let initialPrompt = process.argv.slice(2).join(" ").trim();
 if (!initialPrompt) {
   initialPrompt = await askPrompt("\x1b[90m> Task: \x1b[0m");
   if (!initialPrompt) {
@@ -22,41 +56,33 @@ if (!initialPrompt) {
   }
 }
 
-const ollamaHost = process.env.OLLAMA_HOST ?? "http://localhost:11434";
-const ollamaModel = process.env.OLLAMA_MODEL ?? "qwen3-vl:4b-instruct";
-const ollamaVision = process.env.OLLAMA_VISION === "true";
-const ollamaThinking = process.env.OLLAMA_THINKING === "true";
-const headless = process.env.HEADLESS === "true";
-const isCloud = !ollamaHost.includes("localhost") && !ollamaHost.includes("127.0.0.1");
-
-log.info("─── Configuration ───────────────────────────────");
-log.info(`  Ollama  : ${ollamaHost} ${isCloud ? "(cloud)" : "(local)"}`);
-log.info(`  Model   : ${ollamaModel}`);
-log.info(`  Vision  : ${ollamaVision ? "enabled (screenshots attached)" : "disabled (screenshots skipped)"}`);
-log.info(`  Thinking: ${ollamaThinking ? "enabled (stream)" : "disabled (non-stream)"}`);
-log.info(`  Fallback: ${process.env.OPENCODE_MODEL ?? "anthropic/claude-sonnet-4-5-20250514"} @ ${process.env.OPENCODE_HOST ?? "http://127.0.0.1:4096/v1"}`);
-log.info(`  Browser : ${headless ? "headless" : "visible"}`);
-log.info("─────────────────────────────────────────────────");
-
 const browser = new BrowserManager();
 const ai = new FallbackClient({
   ollama: {
-    apiKey: process.env.OLLAMA_API_KEY,
+    apiKeys: parseKeys(process.env.OLLAMA_API_KEY),
     host: ollamaHost,
     model: ollamaModel,
-    supportsVision: ollamaVision,
-    thinking: ollamaThinking,
+    supportsVision: supportsVision,
+    thinking: supportsThinking,
   },
   opencode: {
     model: process.env.OPENCODE_MODEL,
     baseUrl: process.env.OPENCODE_HOST,
-    apiKey: process.env.OPENCODE_API_KEY,
+    apiKeys: parseKeys(process.env.OPENCODE_API_KEY),
+  },
+  openrouter: {
+    model: process.env.OPENROUTER_MODEL,
+    apiKeys: openrouterKeys,
+    siteUrl: process.env.OPENROUTER_SITE_URL,
+    siteName: process.env.OPENROUTER_SITE_NAME,
   },
 });
 
 
-async function isYouTubePlaying(page: Awaited<ReturnType<typeof browser.launch>>): Promise<boolean> {
+async function isYouTubePlaying(): Promise<boolean> {
+  if (!browser.isLaunched()) return false;
   try {
+    const page = browser.getPage();
     if (!page.url().includes("youtube.com/watch")) return false;
     return page.evaluate(() => {
       const video = document.querySelector<HTMLVideoElement>("video");
@@ -67,29 +93,55 @@ async function isYouTubePlaying(page: Awaited<ReturnType<typeof browser.launch>>
   }
 }
 
-try {
-  log.info("Launching browser...");
-  const page = await browser.launch(headless);
+function runWithInterrupt(prompt: string): Promise<import("@/agent/loop.ts").AgentResult> {
+  const controller = new AbortController();
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+  }
+  const onData = (data: Buffer) => {
+    if (data[0] === 0x1b && data.length === 1) {
+      log.warn("ESC — interrupting agent...");
+      controller.abort();
+    } else if (data[0] === 0x03) {
+      process.exit(0);
+    }
+  };
+  process.stdin.on("data", onData);
+  return runAgentLoop(browser, headless, ai, prompt, controller.signal).finally(() => {
+    process.stdin.removeListener("data", onData);
+    if (process.stdin.isTTY) {
+      process.stdin.setRawMode(false);
+      process.stdin.pause();
+    }
+  });
+}
 
+try {
   let currentPrompt = initialPrompt;
+  let lastSummary = "";
 
   while (true) {
     log.agent(currentPrompt);
-    const result = await runAgentLoop(page, ai, currentPrompt);
+    const result = await runWithInterrupt(currentPrompt);
 
     if (result.success) {
       log.success(result.summary);
+      lastSummary = result.summary;
     } else {
       log.fail(result.summary);
+      lastSummary = "";
     }
 
-    if (await isYouTubePlaying(page)) {
+    if (await isYouTubePlaying()) {
       log.info("YouTube video playing — browser stays open.");
     }
 
     const followUp = await askPrompt("\x1b[90m> Follow-up (or Enter to exit): \x1b[0m");
     if (!followUp) break;
-    currentPrompt = followUp;
+    currentPrompt = lastSummary
+      ? `Previous task result:\n${lastSummary}\n\nFollow-up: ${followUp}`
+      : followUp;
   }
 } catch (err: unknown) {
   log.error(toMessage(err));

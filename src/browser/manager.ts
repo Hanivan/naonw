@@ -5,6 +5,8 @@ export class BrowserManager {
   private browser: Browser | null = null;
   private page: Page | null = null;
 
+  isLaunched(): boolean { return this.browser !== null; }
+
   async launch(headless = false): Promise<Page> {
     this.browser = await puppeteer.launch({ headless });
     this.page = await this.browser.newPage();

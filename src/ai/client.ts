@@ -8,6 +8,7 @@ export interface ChatResult {
   thinking: string | null;
   toolCalls: ToolCallResult[];
   streamed?: boolean;
+  provider: string;
 }
 
 export interface AIClient {
@@ -18,6 +19,7 @@ export interface AIClient {
   addImage(base64: string): void;
   chat(tools: ToolDefinition[]): Promise<ChatResult>;
   clearHistory(): void;
+  close?(): Promise<void>;
   readonly provider: string;
 }
 

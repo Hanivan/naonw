@@ -8,8 +8,9 @@ const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
 const BLUE = "\x1b[34m";
 const GRAY = "\x1b[90m";
+const WHITE = "\x1b[97m";
 
-function timestamp(): string {
+export function timestamp(): string {
   return `${GRAY}${new Date().toISOString().slice(5, 23).replace("T", " ")}${RESET}`;
 }
 
@@ -50,6 +51,18 @@ export const log = {
     if (process.env.DEBUG) {
       console.log(`${timestamp()} ${tag(GRAY, "DEBUG")} ${DIM}${msg}${RESET}`);
     }
+  },
+  _tokenIn: 0,
+  _tokenOut: 0,
+  token(pin: number, pout: number): void {
+    this._tokenIn += pin;
+    this._tokenOut += pout;
+  },
+  tokenTotal(): void {
+    const total = this._tokenIn + this._tokenOut;
+    console.log(`${timestamp()} ${tag(WHITE, "TOKEN")} ${DIM}${this._tokenIn} in → ${this._tokenOut} out${RESET} ${GRAY}(${total} total)${RESET}`);
+    this._tokenIn = 0;
+    this._tokenOut = 0;
   },
   success(msg: string): void {
     console.log(`\n${timestamp()} ${tag(GREEN, "DONE")} ${BOLD}${msg}${RESET}`);

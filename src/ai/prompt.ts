@@ -25,14 +25,27 @@ Decide BEFORE opening a browser:
    → If answer is visible, call done() immediately — do NOT navigate further
    → Only click a result link if the search page lacks the answer
 
+━━━ SEARCH RULES ━━━
+- NEVER append a year to search queries. The search engine returns current results automatically.
+  BAD: navigate("https://www.google.com/search?q=best+laptop+2025")
+  GOOD: navigate("https://www.google.com/search?q=best+laptop")
+- When the user asks about products, items, or listings — ALWAYS include prices in done().
+  If prices are visible on the page, include them. If not, read more pages or scroll to find them.
+
 ━━━ EFFICIENCY RULES ━━━
 - Prefer direct URL navigation over clicking links (e.g. navigate to the exact page, not Google → click → page)
 - Read PAGE TEXT and PAGE TABLES before scrolling — the content may already be there
-- Never scroll more than 3 times looking for content that should be on the page
+- Never scroll more than 2 times on the same page. If info is not found after 2 scrolls → navigate elsewhere or call done() with what you found
+- NEVER navigate to a URL you already visited. If a page didn't help, try a DIFFERENT source
 - If a page shows "(no interactive elements found)" twice in a row → navigate away, don't wait
 - Do not repeat the same action twice unless the previous attempt returned an error
+- After loading a page, READ PAGE TEXT first. Only scroll if TEXT is missing the answer
+- When you see relevant information in PAGE TEXT or TABLES → call done() IMMEDIATELY with the answer + source URL
 - Use select() for dropdowns, never click() on <option> elements directly
 - After typing into a search field, press Enter by clicking the submit button or navigate directly
+- AC inputs MUST use typeAndSelect() in 2 steps: (1) call without pick to read suggestions, (2) call again with exact suggestion text as pick
+  BAD: typeAndSelect("#fromAddr", "Tokyo", "Tokyo")  ← guessing before seeing suggestions
+  GOOD: typeAndSelect("#fromAddr", "Tokyo") → read result → typeAndSelect("#fromAddr", "Tokyo", "Tokyo, Japan")
 
 ━━━ PAGE CONTENT ━━━
 PAGE TEXT — visible text: prices, names, snippets, descriptions. Read before acting.
@@ -46,15 +59,17 @@ PAGINATION — page/result count. Use to know if there are more pages.
 ━━━ TOOLS ━━━
 - navigate(url)
 - click(selector)
-- type(selector, text, clear?)   ← TEXT-INPUT and TEXTAREA only
-- select(selector, value)        ← SELECT dropdowns only
+- type(selector, text, clear?)              ← TEXT-INPUT and TEXTAREA only
+- typeAndSelect(selector, text)             ← AUTOCOMPLETE inputs (AC kind) step 1: type and get suggestions list
+- typeAndSelect(selector, text, pick)       ← AUTOCOMPLETE inputs step 2: type again and pick exact suggestion text from step 1 result
+- select(selector, value)                  ← SELECT dropdowns only
 - scroll(direction, amount?)
 - wait(ms)${screenshotLine}
 - done(summary)
 
 Element kinds in PAGE STATE:
   I/TA → type()    SUB/BTN → click()    A → click(selector)
-  SEL  → select()  CHK/RAD → click()
+  SEL  → select()  CHK/RAD → click()    AC → typeAndSelect() [2-step: first no pick to see suggestions, then with exact pick]
   M! prefix = modal element (dismiss first)
   Format: KIND · selector · label · text · [options] · flags(chk/exp)
 
@@ -64,6 +79,17 @@ Element kinds in PAGE STATE:
 - Newsletter / notification popup → click "Close", "No thanks", or "×"
 - YouTube ad → click "Skip Ad" or "Skip" immediately
 
+━━━ MEDIA PLAYBACK ━━━
+- User asks to play/watch/listen → you MUST land on the actual watch URL. done() is ONLY allowed when current URL contains "/watch?v=" or "/track/" or similar media page.
+- YouTube play flow:
+  1. navigate to search results
+  2. Read ELEMENTS — find A element with href containing "/watch?v="
+  3. click(that_selector)  ← use click(), NOT navigate()
+  4. Wait for page load — current URL must contain "/watch?v="
+  5. Only after landing on /watch?v= page → done()
+- "Now playing" label in search results thumbnail means the video is PREVIEWING in search, NOT actually playing in browser. Current URL must be /watch?v= before done().
+- NEVER call done() if current URL is /results or /search — that is a search page, not a watch page.
+
 ━━━ CAPTCHA ━━━
 - Call solveCaptcha() → get screenshot + challenge text
 - Identify tile IDs (0–15) matching the description → clickCaptchaTile(ids, verify=false)
@@ -71,28 +97,58 @@ Element kinds in PAGE STATE:
 - When done → clickCaptchaTile([], verify=true)
 
 ${stuckLine}
-When finished → done("clear summary of what was accomplished or found")`;
+━━━ DONE() RULES ━━━
+- ALWAYS cite direct source URLs in done() — the specific article/page URL, never the search engine result page.
+- For news/articles: each item MUST have its own direct URL. If you only have the search page, click the article first to get its URL.
+- For product listings: include price next to each item, and source URL.
+- FORMAT: each result item uses this block structure (repeat per item, separated by blank line):
+    Title: <name, headline, or product name>
+    Source: <direct URL to the article/page — NOT the search page>
+    <ContextKey>: <value relevant to what the user asked>
+
+  ContextKey examples (pick what fits the task):
+    • news/articles  → Publisher: Metro TV | Date: 13 Mei 2026 | Summary: ...
+    • products/price → Price: Rp 1.500.000 | Store: Tokopedia | Spec: ...
+    • shipping       → Service: FedEx IP | Transit: 3-5 hari | Price: USD 45
+    • people/facts   → Role: Presiden RI | Born: 1951 | Party: Gerindra
+
+  Example output for news task:
+    Title: Prabowo Effect! Kunci Keberhasilan Ekonomi Indonesia 2026
+    Source: https://www.metrotv.com/artikel/abc123
+    Publisher: Metro TV
+    Date: 13 Mei 2026
+    Summary: Dampak ekonomi kebijakan Prabowo terhadap pertumbuhan 2026.
+
+    Title: Gubernur Bali Undang Prabowo Buka Pesta Kesenian Bali 2026
+    Source: https://www.antaranews.com/berita/xyz
+    Publisher: ANTARA News
+    Date: 12 Mei 2026
+    Summary: Gubernur Bali mengundang Presiden Prabowo untuk acara seni tahunan.
+
+When finished → done("formatted answer with source URLs")`;
 }
 
-const KIND_MAP: Record<string, (type?: string) => string | null> = {
+type El = Parameters<typeof buildDOMContext>[0]["elements"][number];
+const KIND_MAP: Record<string, (type?: string, el?: El) => string | null> = {
   select: () => "SEL",
   textarea: () => "TA",
   a: () => "A",
   button: () => "BTN",
-  input: (type) => {
+  input: (type, el) => {
     const t = (type ?? "text").toLowerCase();
     if (t === "hidden") return null;
     if (t === "submit" || t === "button") return "SUB";
     if (t === "checkbox") return "CHK";
     if (t === "radio") return "RAD";
+    if (el?.autocomplete) return "AC";
     return "I";
   },
 };
 
-function elementToLine(el: Parameters<typeof buildDOMContext>[0]["elements"][number]): string | null {
+function elementToLine(el: El): string | null {
   const resolver = KIND_MAP[el.tag];
   if (!resolver) return null;
-  const kind = resolver(el.type);
+  const kind = resolver(el.type, el);
   if (!kind) return null;
 
   const parts: string[] = [el.inModal ? `M!${kind}` : kind, el.selector];
@@ -113,7 +169,9 @@ export function buildDOMContext(dom: ParsedDOM): string {
   const rest = dom.elements.filter((e) => !e.inModal);
   const lines = [...modal, ...rest].map(elementToLine).filter(Boolean).join("\n");
 
-  const parts: string[] = [`${dom.title}\n${dom.url}`];
+  const isSearchPage = /\/(results|search)\b/.test(dom.url) || dom.url.includes("google.com/search");
+  const urlNote = isSearchPage ? " ⚠️ SEARCH PAGE — not a media/watch page" : "";
+  const parts: string[] = [`${dom.title}\nCURRENT URL: ${dom.url}${urlNote}`];
 
   if (dom.loading) parts.push("LOADING");
   if (modal.length) parts.push("MODAL — dismiss M! elements first");
