@@ -1,0 +1,20 @@
+{
+  "name": "puppeteer-ai",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun src/index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@opencode-ai/sdk": "^1.14.48",
+    "ollama": "^0.6.3",
+    "puppeteer": "^24.43.1"
+  }
+}
