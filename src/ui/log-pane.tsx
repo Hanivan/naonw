@@ -41,7 +41,10 @@ const DIM_LEVELS   = new Set(["INFO", "DEBUG", "TOKEN", "ELEMENT"]);
 const BOLD_LEVELS  = new Set(["BRAND", "DONE", "FAIL", "ERROR", "CAPTCHA"]);
 
 function fancyMsg(entry: LogEntry): string {
-  if (entry.level === "TOOL") return entry.msg.split(" ")[0] ?? entry.msg;
+  if (entry.level === "TOOL") {
+    const jsonIdx = entry.msg.indexOf(" {");
+    return jsonIdx >= 0 ? entry.msg.slice(0, jsonIdx) : entry.msg;
+  }
   if (entry.level === "AGENT" || entry.level === "THINK") {
     const lines = entry.msg.split("\n").filter((l) => l.trim());
     const first = lines[0] ?? entry.msg;
@@ -97,24 +100,25 @@ interface LogPaneProps {
   scrollRef: React.RefObject<ScrollViewRef | null>;
 }
 
+function renderEntry(entry: LogEntry, idx: number) {
+  if (!IS_FANCY) {
+    return (
+      <Box key={idx} flexDirection="row">
+        <Text color={OLD_COLOR[entry.level] ?? "white"} bold>{`● ${padLevel(entry.level)} `}</Text>
+        <Text wrap="wrap">{entry.msg}</Text>
+      </Box>
+    );
+  }
+  if (entry.level === "BRAND") return <BrandEntry key={idx} />;
+  if (entry.level === "PROVIDER") return <ProviderEntry key={idx} entry={entry} />;
+  return <FancyEntry key={idx} entry={entry} />;
+}
+
 export function LogPane({ logs, paneHeight, scrollRef }: LogPaneProps) {
   return (
     <Box height={paneHeight} flexDirection="column">
       <ScrollView ref={scrollRef}>
-        {logs.map((entry, idx) =>
-          IS_FANCY ? (
-            entry.level === "BRAND"
-              ? <BrandEntry key={idx} />
-              : entry.level === "PROVIDER"
-              ? <ProviderEntry key={idx} entry={entry} />
-              : <FancyEntry key={idx} entry={entry} />
-          ) : (
-            <Box key={idx} flexDirection="row">
-              <Text color={OLD_COLOR[entry.level] ?? "white"} bold>{`● ${padLevel(entry.level)} `}</Text>
-              <Text wrap="wrap">{entry.msg}</Text>
-            </Box>
-          )
-        )}
+        {logs.map(renderEntry)}
       </ScrollView>
     </Box>
   );

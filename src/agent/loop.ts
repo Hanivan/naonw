@@ -61,6 +61,13 @@ export async function runAgentLoop(
   let lastToolAction = "";
   let madeProgress = false;
 
+  const abortRace = signal
+    ? new Promise<never>((_, reject) => {
+        if (signal.aborted) reject(new DOMException("Aborted", "AbortError"));
+        else signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      })
+    : null;
+
   for (let i = 0; i < MAX_ITERATIONS; i++) {
     if (signal?.aborted) {
       log.warn("Agent interrupted — stopping loop");
@@ -125,7 +132,13 @@ export async function runAgentLoop(
 
     log.info("Waiting for AI...");
     store.setStatus({ agentStatus: "thinking" });
-    const response = await ai.chat(activeTools);
+    let response;
+    try {
+      response = await (abortRace ? Promise.race([ai.chat(activeTools), abortRace]) : ai.chat(activeTools));
+    } catch (e) {
+      if (signal?.aborted) break;
+      throw e;
+    }
 
     const modalEls = dom?.elements.filter((e) => e.inModal) ?? [];
     const modalTag = modalEls.length
@@ -154,14 +167,9 @@ export async function runAgentLoop(
       ai.addAssistant(response.content);
     }
 
-    if (response.toolCalls.length > 0) {
-      log.agent(`${agentPrefix} AI → ${response.toolCalls.map((tc) => tc.name).join(", ")}`);
-    }
 
     if (response.toolCalls.length === 0) {
       if (response.content) {
-        // keep commented
-        // log.warn("AI returned text without tool call — reminding to use tools");
         const typeable = dom?.elements.find((e) =>
           e.tag === "textarea" || (e.tag === "input" && !["submit", "button", "hidden", "checkbox", "radio"].includes(e.type ?? ""))
         );
@@ -199,7 +207,7 @@ export async function runAgentLoop(
         consecutiveScrolls = 0;
       }
 
-      log.tool(call.name, call.arguments);
+      log.tool(call.name, call.arguments, response.provider);
 
       if (BROWSER_TOOLS.has(call.name)) page = await ensurePage();
       store.setStatus({ agentStatus: "tool" });

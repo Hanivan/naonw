@@ -8,6 +8,7 @@ import { store } from "@/ui/store.ts";
 import { App } from "@/ui/app.tsx";
 import { log } from "@/utils/logger.ts";
 import { toMessage } from "@/utils/errors.ts";
+import { speak } from "@/utils/tts.ts";
 
 function parseKeys(raw: string | undefined): string[] | undefined {
   if (!raw) return undefined;
@@ -41,12 +42,9 @@ function handleSubmit(text: string): void {
 // ── Interrupt ─────────────────────────────────────────────
 let activeController = new AbortController();
 function handleInterrupt(): void {
-  log.warn("ESC — interrupting agent...");
+  log.warn("ESC — stopping...");
   activeController.abort();
-  if (inputResolve) {
-    inputResolve("");
-    inputResolve = null;
-  }
+  if (inputResolve) { inputResolve(""); inputResolve = null; }
 }
 
 // ── Browser + AI ──────────────────────────────────────────
@@ -146,6 +144,7 @@ try {
     if (result.success) {
       log.success(result.summary);
       lastSummary = result.summary;
+      if (process.env.TTS !== "false") speak(result.summary).catch(() => {});
     } else {
       log.fail(result.summary);
       lastSummary = "";

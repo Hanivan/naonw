@@ -34,7 +34,7 @@ export function TimerBar({ status }: TimerBarProps) {
   const color   = running ? "yellow" : "green";
 
   return (
-    <Box paddingX={1}>
+    <Box paddingX={1} marginTop={1}>
       {running
         ? <Text color={color}><Spinner type="dots" /> {label}</Text>
         : <Text color={color}>⁂ {label}</Text>

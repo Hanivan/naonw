@@ -22,11 +22,7 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
   const atBottomRef = useRef(true);
 
   useEffect(() => {
-    const onLog = () => {
-      const ref = scrollRef.current;
-      atBottomRef.current = !ref || ref.getScrollOffset() >= ref.getBottomOffset();
-      setLogs([...store.logs]);
-    };
+    const onLog = () => setLogs([...store.logs]);
     const onStatus = () => setStatus({ ...store.status });
     store.on("log", onLog);
     store.on("status", onStatus);
@@ -35,15 +31,19 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
 
   useEffect(() => {
     if (atBottomRef.current) scrollRef.current?.scrollToBottom();
-  }, [logs]);
+  });
 
-  const paneHeight = Math.max(1, rows - 5);
+  const paneHeight = Math.max(1, rows - 6);
 
   useInput((_char, key) => {
-    if (key.upArrow)   scrollRef.current?.scrollBy(-3);
-    if (key.downArrow) scrollRef.current?.scrollBy(3);
-    if (key.pageUp)    scrollRef.current?.scrollBy(-paneHeight);
-    if (key.pageDown)  scrollRef.current?.scrollBy(paneHeight);
+    if (key.upArrow || key.pageUp) {
+      atBottomRef.current = false;
+      scrollRef.current?.scrollBy(key.upArrow ? -3 : -paneHeight);
+    }
+    if (key.downArrow || key.pageDown) {
+      atBottomRef.current = true;
+      scrollRef.current?.scrollBy(key.downArrow ? 3 : paneHeight);
+    }
   });
 
   const handleKey = useCallback(() => {

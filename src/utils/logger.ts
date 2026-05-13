@@ -19,9 +19,10 @@ export const log = {
   info(msg: string): void {
     store.pushLog({ level: "INFO", msg, timestamp: ts() });
   },
-  tool(name: string, args: Record<string, unknown>): void {
+  tool(name: string, args: Record<string, unknown>, provider?: string): void {
     const argsStr = Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
-    store.pushLog({ level: "TOOL", msg: `${name}${argsStr}`, timestamp: ts() });
+    const provStr = provider ? ` @${provider}` : "";
+    store.pushLog({ level: "TOOL", msg: `${name}${provStr}${argsStr}`, timestamp: ts() });
   },
   result(msg: string): void {
     store.pushLog({ level: "RESULT", msg, timestamp: ts() });
