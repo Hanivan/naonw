@@ -1,73 +1,75 @@
-const RESET = "\x1b[0m";
-const BOLD = "\x1b[1m";
-const DIM = "\x1b[2m";
-const CYAN = "\x1b[36m";
-const YELLOW = "\x1b[33m";
-const GREEN = "\x1b[32m";
-const RED = "\x1b[31m";
-const MAGENTA = "\x1b[35m";
-const BLUE = "\x1b[34m";
-const GRAY = "\x1b[90m";
-const WHITE = "\x1b[97m";
+import { store, type ProviderData } from "@/ui/store.ts";
 
-export function timestamp(): string {
-  return `${GRAY}${new Date().toISOString().slice(5, 23).replace("T", " ")}${RESET}`;
+function ts(): string {
+  return new Date().toISOString().slice(5, 23).replace("T", " ");
 }
 
-function tag(color: string, label: string): string {
-  return `${color}${BOLD}[${label}]${RESET}`;
+export function timestamp(): string {
+  return ts();
 }
 
 export const log = {
+  brand(msg: string): void {
+    store.pushLog({ level: "BRAND", msg, timestamp: ts() });
+  },
+  provider(name: string, model: string, cloud: boolean, keys: number): void {
+    const data: ProviderData = { name, model, cloud, keys };
+    store.pushLog({ level: "PROVIDER", msg: `${name} ${model}`, timestamp: ts(), data });
+  },
   info(msg: string): void {
-    console.log(`${timestamp()} ${tag(CYAN, "INFO")} ${msg}`);
+    store.pushLog({ level: "INFO", msg, timestamp: ts() });
   },
   tool(name: string, args: Record<string, unknown>): void {
-    const argsStr = Object.keys(args).length ? ` ${DIM}${JSON.stringify(args)}${RESET}` : "";
-    console.log(`${timestamp()} ${tag(YELLOW, "TOOL")} ${BOLD}${name}${RESET}${argsStr}`);
+    const argsStr = Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
+    store.pushLog({ level: "TOOL", msg: `${name}${argsStr}`, timestamp: ts() });
   },
   result(msg: string): void {
-    console.log(`${timestamp()} ${tag(GREEN, "RESULT")} ${msg}`);
+    store.pushLog({ level: "RESULT", msg, timestamp: ts() });
   },
   warn(msg: string): void {
-    console.log(`${timestamp()} ${tag(YELLOW, "WARN")} ${msg}`);
+    store.pushLog({ level: "WARN", msg, timestamp: ts() });
   },
   error(msg: string): void {
-    console.error(`${timestamp()} ${tag(RED, "ERROR")} ${msg}`);
+    store.pushLog({ level: "ERROR", msg, timestamp: ts() });
   },
   captcha(msg: string): void {
-    console.log(`\n${timestamp()} ${tag(MAGENTA, "CAPTCHA")} ${BOLD}${msg}${RESET}\n`);
+    store.pushLog({ level: "CAPTCHA", msg, timestamp: ts() });
   },
   agent(msg: string): void {
-    console.log(`${timestamp()} ${tag(BLUE, "AGENT")} ${msg}`);
+    store.pushLog({ level: "AGENT", msg, timestamp: ts() });
   },
   think(msg: string): void {
-    console.log(`${timestamp()} ${tag(MAGENTA, "THINK")} ${DIM}${msg}${RESET}`);
+    store.pushLog({ level: "THINK", msg, timestamp: ts() });
   },
   element(detail: string, html: string): void {
-    console.log(`${timestamp()} ${tag(CYAN, "ELEMENT")} ${DIM}${detail}${RESET}\n           ${GRAY}${html}${RESET}`);
+    store.pushLog({ level: "ELEMENT", msg: `${detail}  ${html}`, timestamp: ts() });
   },
   debug(msg: string): void {
     if (process.env.DEBUG) {
-      console.log(`${timestamp()} ${tag(GRAY, "DEBUG")} ${DIM}${msg}${RESET}`);
+      store.pushLog({ level: "DEBUG", msg, timestamp: ts() });
     }
   },
-  _tokenIn: 0,
-  _tokenOut: 0,
+  stream(chunk: string): void {
+    store.appendStream(chunk);
+  },
   token(pin: number, pout: number): void {
-    this._tokenIn += pin;
-    this._tokenOut += pout;
+    store.setStatus({
+      tokensIn: store.status.tokensIn + pin,
+      tokensOut: store.status.tokensOut + pout,
+    });
   },
   tokenTotal(): void {
-    const total = this._tokenIn + this._tokenOut;
-    console.log(`${timestamp()} ${tag(WHITE, "TOKEN")} ${DIM}${this._tokenIn} in → ${this._tokenOut} out${RESET} ${GRAY}(${total} total)${RESET}`);
-    this._tokenIn = 0;
-    this._tokenOut = 0;
+    const { tokensIn, tokensOut } = store.status;
+    store.pushLog({
+      level: "TOKEN",
+      msg: `${tokensIn} in → ${tokensOut} out (${tokensIn + tokensOut} total)`,
+      timestamp: ts(),
+    });
   },
   success(msg: string): void {
-    console.log(`\n${timestamp()} ${tag(GREEN, "DONE")} ${BOLD}${msg}${RESET}`);
+    store.pushLog({ level: "DONE", msg, timestamp: ts() });
   },
   fail(msg: string): void {
-    console.log(`\n${timestamp()} ${tag(RED, "FAIL")} ${BOLD}${msg}${RESET}`);
+    store.pushLog({ level: "FAIL", msg, timestamp: ts() });
   },
 };

@@ -1,13 +1,8 @@
 import type { ChatResult, ToolCallResult, ToolDefinition } from "@/ai/client.ts";
 import { DirectProvider } from "@/ai/provider.ts";
 import { Ollama, type Message, type Tool } from "ollama";
-import { log, timestamp } from "@/utils/logger.ts";
+import { log } from "@/utils/logger.ts";
 
-const RESET = "\x1b[0m";
-const BOLD = "\x1b[1m";
-const DIM = "\x1b[2m";
-const MAGENTA = "\x1b[35m";
-const BLUE = "\x1b[34m";
 
 export interface OllamaClientConfig {
   apiKeys?: string[];
@@ -175,15 +170,11 @@ export class OllamaClient extends DirectProvider {
     let lastMessage: Message | null = null;
     let lastPromptEval = 0;
     let lastEvalCount = 0;
-    let printedThinkPrefix = false;
-    let printedContentPrefix = false;
     let inThinkTag = false;
-    let firstChunk = true;
+    let thinkingStarted = false;
+    let contentStarted = false;
 
     for await (const chunk of stream) {
-      if (firstChunk) {
-        firstChunk = false;
-      }
       lastMessage = chunk.message;
       if (chunk.prompt_eval_count) lastPromptEval = chunk.prompt_eval_count;
       if (chunk.eval_count) lastEvalCount = chunk.eval_count;
@@ -193,18 +184,17 @@ export class OllamaClient extends DirectProvider {
       if (thinking) {
         fullThinking += thinking;
         if (this.thinking) {
-          if (!printedThinkPrefix) {
-            process.stdout.write(`${timestamp()} ${MAGENTA}${BOLD}[THINK]${RESET} ${DIM}`);
-            printedThinkPrefix = true;
+          if (!thinkingStarted) {
+            log.think("");
+            thinkingStarted = true;
           }
-          process.stdout.write(thinking);
+          log.stream(thinking);
         }
       }
 
       if (content) {
         fullContent += content;
 
-        // parse visible text across chunk boundaries
         let visible = "";
         let buf = content;
         while (buf.length > 0) {
@@ -223,20 +213,13 @@ export class OllamaClient extends DirectProvider {
         }
 
         if (visible) {
-          if (printedThinkPrefix && !printedContentPrefix) {
-            process.stdout.write(`${RESET}\n`);
+          if (!contentStarted) {
+            log.agent("AI: ");
+            contentStarted = true;
           }
-          if (!printedContentPrefix) {
-            process.stdout.write(`${timestamp()} ${BLUE}${BOLD}[AGENT]${RESET} AI: `);
-            printedContentPrefix = true;
-          }
-          process.stdout.write(visible);
+          log.stream(visible);
         }
       }
-    }
-
-    if (printedThinkPrefix || printedContentPrefix) {
-      process.stdout.write(`${RESET}\n`);
     }
 
     if (lastPromptEval || lastEvalCount) {

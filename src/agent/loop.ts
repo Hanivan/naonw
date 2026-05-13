@@ -7,6 +7,7 @@ import { toolDefinitions } from "@/agent/tools/definitions.ts";
 import { executeTool } from "@/agent/tools/execute.ts";
 import { log } from "@/utils/logger.ts";
 import { waitForEnter } from "@/utils/prompt.ts";
+import { store } from "@/ui/store.ts";
 
 const MAX_ITERATIONS = 20;
 const MAX_SAME_URL = 3;
@@ -25,6 +26,7 @@ export async function runAgentLoop(
   ai: AIClient,
   userPrompt: string,
   signal?: AbortSignal,
+  waitForInput?: () => Promise<string>,
 ): Promise<AgentResult> {
   let page: Page | null = browser.isLaunched() ? browser.getPage() : null;
 
@@ -32,10 +34,20 @@ export async function runAgentLoop(
     if (!page) {
       log.info("Launching browser...");
       page = await browser.launch(headless);
+      store.setStatus({ browserOpen: true });
     }
     return page;
   }
   ai.clearHistory();
+  store.setStatus({
+    agentStatus: "idle",
+    iteration: 0,
+    maxIterations: MAX_ITERATIONS,
+    tokensIn: 0,
+    tokensOut: 0,
+    currentUrl: "",
+    agentStartTime: Date.now(),
+  });
   const supportsVision = process.env.VISION === "true";
   const activeTools = supportsVision ? toolDefinitions : toolDefinitions.filter((t) => t.name !== "screenshot");
   ai.addSystem(buildSystemPrompt(supportsVision));
@@ -54,6 +66,7 @@ export async function runAgentLoop(
       log.warn("Agent interrupted — stopping loop");
       break;
     }
+    store.setStatus({ iteration: i + 1, currentUrl: page?.url() ?? "" });
 
     if (page && await detectCaptcha(page)) {
       if (supportsVision) {
@@ -61,7 +74,11 @@ export async function runAgentLoop(
         ai.addUser("CAPTCHA is visible. Call solveCaptcha() to get a screenshot and challenge text, then clickCaptchaTile() to select matching tiles.");
       } else {
         log.captcha("Solve it in the browser, then press Enter to continue...");
-        await waitForEnter();
+        if (waitForInput) {
+          await waitForInput();
+        } else {
+          await waitForEnter();
+        }
         log.captcha("Resuming...");
       }
     }
@@ -107,6 +124,7 @@ export async function runAgentLoop(
     madeProgress = false;
 
     log.info("Waiting for AI...");
+    store.setStatus({ agentStatus: "thinking" });
     const response = await ai.chat(activeTools);
 
     const modalEls = dom?.elements.filter((e) => e.inModal) ?? [];
@@ -115,10 +133,10 @@ export async function runAgentLoop(
       : "";
     const provTag = `[${response.provider}]`;
     const agentPrefix = `${provTag}${modalTag}`;
+    store.setStatus({ provider: response.provider });
 
     if (!response.streamed) {
       if (response.thinking) log.think(response.thinking);
-      if (response.content) log.agent(`${agentPrefix} AI: ${response.content}`);
     }
 
     if (!response.content && !response.toolCalls.length) {
@@ -142,7 +160,8 @@ export async function runAgentLoop(
 
     if (response.toolCalls.length === 0) {
       if (response.content) {
-        log.warn("AI returned text without tool call — reminding to use tools");
+        // keep commented
+        // log.warn("AI returned text without tool call — reminding to use tools");
         const typeable = dom?.elements.find((e) =>
           e.tag === "textarea" || (e.tag === "input" && !["submit", "button", "hidden", "checkbox", "radio"].includes(e.type ?? ""))
         );
@@ -183,6 +202,7 @@ export async function runAgentLoop(
       log.tool(call.name, call.arguments);
 
       if (BROWSER_TOOLS.has(call.name)) page = await ensurePage();
+      store.setStatus({ agentStatus: "tool" });
       const result = await executeTool(page!, call.name, call.arguments);
       if (call.name !== "done") log.result(result.text);
       if (PROGRESS_ACTIONS.has(call.name) && !result.text.startsWith("Error")) madeProgress = true;

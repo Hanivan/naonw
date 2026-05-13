@@ -1,16 +1,13 @@
-import { createInterface } from "node:readline";
+// src/index.ts
+import { render } from "ink";
+import { createElement } from "react";
 import { BrowserManager } from "@/browser/manager.ts";
 import { FallbackClient } from "@/ai/fallback-client.ts";
 import { runAgentLoop } from "@/agent/loop.ts";
+import { store } from "@/ui/store.ts";
+import { App } from "@/ui/app.tsx";
 import { log } from "@/utils/logger.ts";
 import { toMessage } from "@/utils/errors.ts";
-
-function askPrompt(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(question, (answer) => { rl.close(); resolve(answer.trim()); });
-  });
-}
 
 function parseKeys(raw: string | undefined): string[] | undefined {
   if (!raw) return undefined;
@@ -18,6 +15,7 @@ function parseKeys(raw: string | undefined): string[] | undefined {
   return keys.length ? keys : undefined;
 }
 
+// ── Config ────────────────────────────────────────────────
 const ollamaHost = process.env.OLLAMA_HOST ?? "http://localhost:11434";
 const ollamaModel = process.env.OLLAMA_MODEL ?? "minimax-m2.5";
 const supportsVision = process.env.VISION === "true";
@@ -27,48 +25,44 @@ const isCloud = !ollamaHost.includes("localhost") && !ollamaHost.includes("127.0
 
 const ollamaKeys = parseKeys(process.env.OLLAMA_API_KEY);
 const opencodeKeys = parseKeys(process.env.OPENCODE_API_KEY);
-
 const openrouterKeys = parseKeys(process.env.OPENROUTER_API_KEY);
 
-const providerChain: string[] = [];
-if (openrouterKeys?.length) {
-  providerChain.push(`openrouter  ${process.env.OPENROUTER_MODEL ?? "openrouter/owl-alpha"} [${openrouterKeys.length} keys]`);
+// ── Input channel ─────────────────────────────────────────
+// Bridges InputBar (React) → async agent loop (outside React)
+let inputResolve: ((val: string) => void) | null = null;
+function waitForInput(): Promise<string> {
+  return new Promise((resolve) => { inputResolve = resolve; });
 }
-providerChain.push(`ollama      ${ollamaModel} @ ${ollamaHost} ${isCloud ? "(cloud)" : "(local)"} [${ollamaKeys?.length ?? 0} keys]`);
-if (opencodeKeys?.length) {
-  providerChain.push(`opencode    ${process.env.OPENCODE_MODEL ?? "minimax-m2.5"} @ ${process.env.OPENCODE_HOST ?? "http://127.0.0.1:4096/v1"} [${opencodeKeys.length} keys]`);
+function handleSubmit(text: string): void {
+  inputResolve?.(text);
+  inputResolve = null;
 }
 
-log.info("─── Configuration ───────────────────────────────");
-log.info("  Provider chain (priority order):");
-providerChain.forEach((p, i) => log.info(`    ${i + 1}. ${p}`));
-log.info(`  Vision   : ${supportsVision ? "enabled" : "disabled"}`);
-log.info(`  Thinking : ${supportsThinking ? "enabled (stream)" : "disabled (non-stream)"}`);
-log.info(`  Browser  : ${headless ? "headless" : "visible"}`);
-log.info("─────────────────────────────────────────────────");
-
-let initialPrompt = process.argv.slice(2).join(" ").trim();
-if (!initialPrompt) {
-  initialPrompt = await askPrompt("\x1b[90m> Task: \x1b[0m");
-  if (!initialPrompt) {
-    log.error("No task provided. Exiting.");
-    process.exit(1);
+// ── Interrupt ─────────────────────────────────────────────
+let activeController = new AbortController();
+function handleInterrupt(): void {
+  log.warn("ESC — interrupting agent...");
+  activeController.abort();
+  if (inputResolve) {
+    inputResolve("");
+    inputResolve = null;
   }
 }
 
+// ── Browser + AI ──────────────────────────────────────────
 const browser = new BrowserManager();
 const ai = new FallbackClient({
   ollama: {
-    apiKeys: parseKeys(process.env.OLLAMA_API_KEY),
+    apiKeys: ollamaKeys,
     host: ollamaHost,
     model: ollamaModel,
-    supportsVision: supportsVision,
+    supportsVision,
     thinking: supportsThinking,
   },
   opencode: {
     model: process.env.OPENCODE_MODEL,
     baseUrl: process.env.OPENCODE_HOST,
-    apiKeys: parseKeys(process.env.OPENCODE_API_KEY),
+    apiKeys: opencodeKeys,
   },
   openrouter: {
     model: process.env.OPENROUTER_MODEL,
@@ -78,7 +72,33 @@ const ai = new FallbackClient({
   },
 });
 
+// ── Boot status ───────────────────────────────────────────
+store.setStatus({ supportsVision, supportsThinking });
+log.brand("puppeteer-ai");
+if (openrouterKeys?.length) {
+  log.provider("openrouter", process.env.OPENROUTER_MODEL ?? "openrouter/owl-alpha", false, openrouterKeys.length);
+}
+log.provider("ollama", ollamaModel, isCloud, ollamaKeys?.length ?? 0);
+if (opencodeKeys?.length) {
+  log.provider("opencode", process.env.OPENCODE_MODEL ?? "minimax-m2.5", false, opencodeKeys.length);
+}
+if (supportsVision || supportsThinking) {
+  log.info(`vision ${supportsVision ? "●" : "○"}  think ${supportsThinking ? "●" : "○"}`);
+}
 
+// ── Terminal setup ────────────────────────────────────────
+// Disable ALL mouse modes (clears any leftover state from crashed sessions)
+// then hide cursor. No mouse mode = text selection works natively.
+process.stdout.write("\x1B[?1000l\x1B[?1002l\x1B[?1003l\x1B[?1006l\x1B[?1007l\x1B[?25l");
+const restoreTerminal = () => process.stdout.write("\x1B[?25h");
+process.on("exit", restoreTerminal);
+process.on("SIGTERM", () => { restoreTerminal(); process.exit(0); });
+
+// ── Render TUI ────────────────────────────────────────────
+// alternateScreen: Ink manages \x1B[?1049h enter/exit natively
+render(createElement(App, { onSubmit: handleSubmit, onInterrupt: handleInterrupt }), { alternateScreen: true, exitOnCtrlC: false });
+
+// ── Agent loop (outside React) ────────────────────────────
 async function isYouTubePlaying(): Promise<boolean> {
   if (!browser.isLaunched()) return false;
   try {
@@ -93,37 +113,35 @@ async function isYouTubePlaying(): Promise<boolean> {
   }
 }
 
-function runWithInterrupt(prompt: string): Promise<import("@/agent/loop.ts").AgentResult> {
-  const controller = new AbortController();
-  if (process.stdin.isTTY) {
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-  }
-  const onData = (data: Buffer) => {
-    if (data[0] === 0x1b && data.length === 1) {
-      log.warn("ESC — interrupting agent...");
-      controller.abort();
-    } else if (data[0] === 0x03) {
-      process.exit(0);
-    }
-  };
-  process.stdin.on("data", onData);
-  return runAgentLoop(browser, headless, ai, prompt, controller.signal).finally(() => {
-    process.stdin.removeListener("data", onData);
-    if (process.stdin.isTTY) {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-    }
-  });
-}
-
 try {
+  // Get initial task
+  let initialPrompt = process.argv.slice(2).join(" ").trim();
+  if (!initialPrompt) {
+    store.setStatus({ promptLabel: "Task" });
+    initialPrompt = await waitForInput();
+    if (!initialPrompt) {
+      log.error("No task provided. Exiting.");
+      process.exit(1);
+    }
+  }
+
   let currentPrompt = initialPrompt;
+  let displayPrompt = initialPrompt;
   let lastSummary = "";
 
   while (true) {
-    log.agent(currentPrompt);
-    const result = await runWithInterrupt(currentPrompt);
+    activeController = new AbortController();
+    store.setStatus({ promptLabel: "…running" });
+    log.agent(displayPrompt);
+
+    const result = await runAgentLoop(browser, headless, ai, currentPrompt, activeController.signal, waitForInput);
+
+    store.setStatus({ agentStatus: result.success ? "done" : "interrupted" });
+    const elapsedMs = Date.now() - store.status.agentStartTime;
+    const elapsedSec = Math.floor(elapsedMs / 1000);
+    const elapsedStr = elapsedSec >= 60
+      ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`
+      : `${elapsedSec}s`;
 
     if (result.success) {
       log.success(result.summary);
@@ -132,20 +150,26 @@ try {
       log.fail(result.summary);
       lastSummary = "";
     }
+    log.info(`⁂ Worked for ${elapsedStr}`);
 
     if (await isYouTubePlaying()) {
       log.info("YouTube video playing — browser stays open.");
     }
 
-    const followUp = await askPrompt("\x1b[90m> Follow-up (or Enter to exit): \x1b[0m");
-    if (!followUp) break;
+    store.setStatus({ promptLabel: "Follow-up (Ctrl+C to exit)" });
+    let followUp = "";
+    while (!followUp) followUp = await waitForInput();
+
+    displayPrompt = followUp;
     currentPrompt = lastSummary
       ? `Previous task result:\n${lastSummary}\n\nFollow-up: ${followUp}`
       : followUp;
   }
 } catch (err: unknown) {
   log.error(toMessage(err));
+  process.exit(1);
 } finally {
   await browser.close();
   await ai.close();
+  process.exit(0);
 }
