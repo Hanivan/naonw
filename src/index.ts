@@ -6,7 +6,7 @@ import { FallbackClient } from "@/ai/fallback-client.ts";
 import { runAgentLoop } from "@/agent/loop.ts";
 import { store } from "@/ui/store.ts";
 import { App } from "@/ui/app.tsx";
-import { log } from "@/utils/logger.ts";
+import { log, initLog, writeLog } from "@/utils/logger.ts";
 import { toMessage } from "@/utils/errors.ts";
 import { speak } from "@/utils/tts.ts";
 
@@ -70,6 +70,15 @@ const ai = new FallbackClient({
   },
 });
 
+// ── File log ──────────────────────────────────────────────
+initLog();
+process.on("uncaughtException", (err) => {
+  writeLog("ERROR", `uncaughtException: ${err.message}\n${err.stack ?? ""}`);
+});
+process.on("unhandledRejection", (reason) => {
+  writeLog("ERROR", `unhandledRejection: ${reason}`);
+});
+
 // ── Boot status ───────────────────────────────────────────
 store.setStatus({ supportsVision, supportsThinking });
 log.brand("puppeteer-ai");
@@ -94,7 +103,7 @@ process.on("SIGTERM", () => { restoreTerminal(); process.exit(0); });
 
 // ── Render TUI ────────────────────────────────────────────
 // alternateScreen: Ink manages \x1B[?1049h enter/exit natively
-render(createElement(App, { onSubmit: handleSubmit, onInterrupt: handleInterrupt }), { alternateScreen: true, exitOnCtrlC: false });
+render(createElement(App, { onSubmit: handleSubmit, onInterrupt: handleInterrupt }), { alternateScreen: true, exitOnCtrlC: false, patchConsole: true, maxFps: 24 });
 
 // ── Agent loop (outside React) ────────────────────────────
 async function isYouTubePlaying(): Promise<boolean> {

@@ -1,6 +1,5 @@
-// src/ui/input-bar.tsx
-import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
+import { Box, Text, useInput, useApp, useFocus } from "ink";
+import { TextInput } from "@/ui/text-input.tsx";
 import { useState } from "react";
 
 interface InputBarProps {
@@ -11,11 +10,14 @@ interface InputBarProps {
 
 export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
   const [input, setInput] = useState("");
+  const { exit } = useApp();
+  const { isFocused } = useFocus({ id: "input", autoFocus: true });
 
   useInput((char, key) => {
-    onKey();
-    if (key.ctrl && char === "c") process.exit(0);
+    if (key.ctrl && char === "c") { exit(); return; }
     if (key.escape) { onInterrupt(); return; }
+    if (!isFocused) return;
+    if (!key.upArrow && !key.downArrow && !key.pageUp && !key.pageDown && !key.home && !key.end) onKey();
   });
 
   return (
@@ -27,13 +29,19 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
       borderRight={false}
       paddingX={1}
     >
-      <Text color="cyan" bold>❯ </Text>
-      <TextInput
-        value={input}
-        onChange={setInput}
-        onSubmit={(val) => { setInput(""); onSubmit(val.trim()); }}
-        showCursor
-      />
+      <Text color={isFocused ? "cyan" : "gray"} bold>❯ </Text>
+      {isFocused
+        ? (
+          <TextInput
+            value={input}
+            onChange={setInput}
+            onSubmit={(val) => { setInput(""); onSubmit(val.trim()); }}
+            showCursor
+            focus={isFocused}
+          />
+        )
+        : <Text color="gray" dimColor>scroll mode  ·  Tab to type</Text>
+      }
     </Box>
   );
 }
