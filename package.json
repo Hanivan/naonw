@@ -17,6 +17,7 @@
     "@opencode-ai/sdk": "^1.14.48",
     "@openrouter/sdk": "^0.12.35",
     "@types/figlet": "^1.7.0",
+    "cloakbrowser": "^0.3.28",
     "figlet": "^1.11.0",
     "ink": "^7.0.3",
     "ink-scroll-view": "^0.3.7",

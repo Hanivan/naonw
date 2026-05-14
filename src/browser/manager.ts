@@ -1,4 +1,5 @@
-import puppeteer, { type Browser, type Page } from "puppeteer";
+import { launch } from "cloakbrowser/puppeteer";
+import type { Browser, Page } from "puppeteer";
 import { DEEP_QUERY_SCRIPT } from "@/browser/query.ts";
 
 export class BrowserManager {
@@ -8,11 +9,18 @@ export class BrowserManager {
   isLaunched(): boolean { return this.browser !== null; }
 
   async launch(headless = false): Promise<Page> {
-    this.browser = await puppeteer.launch({ headless });
+    const proxy = process.env.PROXY;
+    const fingerprint = process.env.FINGERPRINT;
+
+    this.browser = await launch({
+      headless,
+      humanize: true,
+      ...(proxy ? { proxy } : {}),
+      ...(fingerprint ? { args: [`--fingerprint=${fingerprint}`] } : {}),
+    });
     this.page = await this.browser.newPage();
     await this.page.setViewport({ width: 1280, height: 720 });
     await this.page.evaluateOnNewDocument(DEEP_QUERY_SCRIPT);
-    // await this.page.goto("https://www.google.com");
     return this.page;
   }
 
