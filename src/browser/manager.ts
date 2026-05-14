@@ -1,6 +1,5 @@
 import { launch } from "cloakbrowser/puppeteer";
-import type { Browser, Page } from "puppeteer";
-import { DEEP_QUERY_SCRIPT } from "@/browser/query.ts";
+import type { Browser, Page } from "puppeteer-core";
 
 export class BrowserManager {
   private browser: Browser | null = null;
@@ -20,7 +19,6 @@ export class BrowserManager {
     });
     this.page = await this.browser.newPage();
     await this.page.setViewport({ width: 1280, height: 720 });
-    await this.page.evaluateOnNewDocument(DEEP_QUERY_SCRIPT);
     return this.page;
   }
 

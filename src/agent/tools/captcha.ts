@@ -1,4 +1,4 @@
-import type { Page } from "puppeteer";
+import type { Page } from "puppeteer-core";
 import type { ToolResult } from "./types.ts";
 
 export async function solveCaptcha(page: Page): Promise<ToolResult> {

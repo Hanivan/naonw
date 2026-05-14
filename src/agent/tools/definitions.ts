@@ -1,3 +1,4 @@
+// src/agent/tools/definitions.ts
 import type { ToolDefinition } from "@/ai/client.ts";
 
 export const toolDefinitions: ToolDefinition[] = [
@@ -17,9 +18,9 @@ export const toolDefinitions: ToolDefinition[] = [
     description: "Click an element on the page",
     parameters: {
       type: "object",
-      required: ["selector"],
+      required: ["ref"],
       properties: {
-        selector: { type: "string", description: "CSS selector of the element to click" },
+        ref: { type: "string", description: "Element ref from the snapshot (e.g. e5)" },
       },
     },
   },
@@ -28,9 +29,9 @@ export const toolDefinitions: ToolDefinition[] = [
     description: "Type text into an input field",
     parameters: {
       type: "object",
-      required: ["selector", "text"],
+      required: ["ref", "text"],
       properties: {
-        selector: { type: "string", description: "CSS selector of the input" },
+        ref: { type: "string", description: "Element ref from the snapshot" },
         text: { type: "string", description: "Text to type" },
         clear: { type: "boolean", description: "Clear existing text first" },
       },
@@ -38,38 +39,26 @@ export const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: "typeAndSelect",
-    description: "Type into an autocomplete/address input and select a suggestion from the dropdown list. Use for inputs with aria-autocomplete='list' or suggestion dropdowns (role='listbox'). Provide 'pick' to match and click a suggestion by text.",
+    description: "Type into an autocomplete input and optionally select a suggestion. Step 1: omit pick to see suggestions. Step 2: include exact pick text from step 1.",
     parameters: {
       type: "object",
-      required: ["selector", "text"],
+      required: ["ref", "text"],
       properties: {
-        selector: { type: "string", description: "CSS selector of the autocomplete input" },
+        ref: { type: "string", description: "Element ref from the snapshot" },
         text: { type: "string", description: "Text to type (triggers suggestions)" },
-        pick: { type: "string", description: "Partial text to match and click from suggestions list" },
+        pick: { type: "string", description: "Exact suggestion text to click" },
       },
     },
   },
   {
     name: "select",
-    description: "Select an option in a dropdown",
+    description: "Select an option in a <select> dropdown",
     parameters: {
       type: "object",
-      required: ["selector", "value"],
+      required: ["ref", "value"],
       properties: {
-        selector: { type: "string", description: "CSS selector of the select element" },
-        value: { type: "string", description: "Value of the option to select" },
-      },
-    },
-  },
-  {
-    name: "scroll",
-    description: "Scroll the page up or down",
-    parameters: {
-      type: "object",
-      required: ["direction"],
-      properties: {
-        direction: { type: "string", description: "Direction to scroll (up or down)" },
-        amount: { type: "number", description: "Pixels to scroll (default 500)" },
+        ref: { type: "string", description: "Element ref from the snapshot" },
+        value: { type: "string", description: "Option value or visible text to select" },
       },
     },
   },
@@ -87,15 +76,11 @@ export const toolDefinitions: ToolDefinition[] = [
   {
     name: "screenshot",
     description: "Take a screenshot of the current page and send it to the AI",
-    parameters: {
-      type: "object",
-      required: [],
-      properties: {},
-    },
+    parameters: { type: "object", required: [], properties: {} },
   },
   {
     name: "solveCaptcha",
-    description: "Take a screenshot of the reCAPTCHA challenge and extract the challenge description. Use this when a CAPTCHA is visible. Returns a screenshot and the challenge text so you can identify which tiles to select.",
+    description: "Take a screenshot of the reCAPTCHA challenge and extract the challenge description.",
     parameters: { type: "object", required: [], properties: {} },
   },
   {
@@ -118,7 +103,7 @@ export const toolDefinitions: ToolDefinition[] = [
       required: ["summary", "lang"],
       properties: {
         summary: { type: "string", description: "Summary of what was accomplished" },
-        lang: { type: "string", enum: ["en", "id"], description: "Language of the summary: 'en' for English, 'id' for Bahasa Indonesia" },
+        lang: { type: "string", enum: ["en", "id"], description: "Language of the summary" },
       },
     },
   },

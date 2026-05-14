@@ -37,10 +37,11 @@ export const log = {
     store.pushLog({ level: "INFO", msg, timestamp: ts() });
     writeFile("INFO", msg);
   },
-  tool(name: string, args: Record<string, unknown>, provider?: string): void {
+  tool(name: string, args: Record<string, unknown>, provider?: string, tag?: string): void {
     const argsStr = Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
     const provStr = provider ? ` @${provider}` : "";
-    const msg = `${name}${provStr}${argsStr}`;
+    const tagStr = tag ? ` ${tag}` : "";
+    const msg = `${name}${provStr}${tagStr}${argsStr}`;
     store.pushLog({ level: "TOOL", msg, timestamp: ts() });
     writeFile("TOOL", msg);
   },

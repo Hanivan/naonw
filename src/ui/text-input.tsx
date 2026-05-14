@@ -2,6 +2,20 @@ import { Text, useInput } from "ink";
 import chalk from "chalk";
 import { useState, useEffect } from "react";
 
+function prevWordStart(str: string, pos: number): number {
+  let i = pos;
+  while (i > 0 && /\s/.test(str.charAt(i - 1))) i--;
+  while (i > 0 && /\S/.test(str.charAt(i - 1))) i--;
+  return i;
+}
+
+function nextWordEnd(str: string, pos: number): number {
+  let i = pos;
+  while (i < str.length && /\s/.test(str.charAt(i))) i++;
+  while (i < str.length && /\S/.test(str.charAt(i))) i++;
+  return i;
+}
+
 interface Props {
   value: string;
   placeholder?: string;
@@ -80,6 +94,17 @@ export function TextInput({
         nextCursor = 0;
       } else if (key.end || key.pageDown) {
         nextCursor = originalValue.length;
+      } else if (key.ctrl && key.leftArrow) {
+        nextCursor = prevWordStart(originalValue, cursorOffset);
+      } else if (key.ctrl && key.rightArrow) {
+        nextCursor = nextWordEnd(originalValue, cursorOffset);
+      } else if (key.ctrl && key.backspace) {
+        const ws = prevWordStart(originalValue, cursorOffset);
+        nextValue = originalValue.slice(0, ws) + originalValue.slice(cursorOffset);
+        nextCursor = ws;
+      } else if (key.ctrl && key.delete) {
+        const we = nextWordEnd(originalValue, cursorOffset);
+        nextValue = originalValue.slice(0, cursorOffset) + originalValue.slice(we);
       } else if (key.leftArrow) {
         if (showCursor) nextCursor--;
       } else if (key.rightArrow) {
@@ -92,7 +117,6 @@ export function TextInput({
           nextCursor--;
         }
       } else if (key.delete) {
-        // forward-delete: remove char AT cursor
         if (cursorOffset < originalValue.length) {
           nextValue =
             originalValue.slice(0, cursorOffset) +

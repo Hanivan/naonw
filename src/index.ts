@@ -8,7 +8,7 @@ import { store } from "@/ui/store.ts";
 import { App } from "@/ui/app.tsx";
 import { log, initLog, writeLog } from "@/utils/logger.ts";
 import { toMessage } from "@/utils/errors.ts";
-import { speak } from "@/utils/tts.ts";
+import { speak, stopSpeak } from "@/utils/tts.ts";
 
 function parseKeys(raw: string | undefined): string[] | undefined {
   if (!raw) return undefined;
@@ -42,7 +42,7 @@ function handleSubmit(text: string): void {
 // ── Interrupt ─────────────────────────────────────────────
 let activeController = new AbortController();
 function handleInterrupt(): void {
-  log.warn("ESC — stopping...");
+  // log.warn("ESC — stopping...");
   activeController.abort();
   if (inputResolve) { inputResolve(""); inputResolve = null; }
 }
@@ -99,11 +99,13 @@ if (supportsVision || supportsThinking) {
 process.stdout.write("\x1B[?1000l\x1B[?1002l\x1B[?1003l\x1B[?1006l\x1B[?1007l\x1B[?25l");
 const restoreTerminal = () => process.stdout.write("\x1B[?25h");
 process.on("exit", restoreTerminal);
+process.on("exit", stopSpeak);
 process.on("SIGTERM", () => { restoreTerminal(); process.exit(0); });
+process.on("SIGINT", () => { process.exit(130); });
 
 // ── Render TUI ────────────────────────────────────────────
 // alternateScreen: Ink manages \x1B[?1049h enter/exit natively
-render(createElement(App, { onSubmit: handleSubmit, onInterrupt: handleInterrupt }), { alternateScreen: true, exitOnCtrlC: false, patchConsole: true, maxFps: 24 });
+render(createElement(App, { onSubmit: handleSubmit, onInterrupt: handleInterrupt }), { alternateScreen: true, exitOnCtrlC: false, patchConsole: true, maxFps: 24, kittyKeyboard: { flags: ["disambiguateEscapeCodes"] } });
 
 // ── Agent loop (outside React) ────────────────────────────
 async function isYouTubePlaying(): Promise<boolean> {

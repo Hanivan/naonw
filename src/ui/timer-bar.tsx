@@ -30,16 +30,19 @@ export function TimerBar({ status }: TimerBarProps) {
   }
 
   const elapsed = formatElapsed(now - status.agentStartTime);
-  const label   = running ? `Running for ${elapsed}` : `Worked for ${elapsed}`;
   const color   = running ? "yellow" : "green";
+  const statusLabel = status.agentStatus === "thinking" ? "thinking…"
+    : status.agentStatus === "tool" ? "running tool…"
+    : null;
 
   return (
     <Box paddingX={1} marginTop={1}>
       {running
-        ? <Text color={color}><Spinner type="dots" /> {label}</Text>
-        : <Text color={color}>⁂ {label}</Text>
+        ? <Text color={color}><Spinner type="dots" /> {elapsed}</Text>
+        : <Text color={color}>⁂ {elapsed}</Text>
       }
       <Text dimColor>  · iter {status.iteration}/{status.maxIterations}</Text>
+      {statusLabel && <Text dimColor>  · <Text color={color}>{statusLabel}</Text></Text>}
     </Box>
   );
 }
