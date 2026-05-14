@@ -1,6 +1,8 @@
 import { appendFileSync, writeFileSync } from "node:fs";
 import { store, type ProviderData } from "@/ui/store.ts";
 
+let activeGroupId: string | null = null;
+
 const LOG_FILE = process.env.LOG_FILE ?? "logs/run.log";
 
 function ts(): string {
@@ -34,23 +36,23 @@ export const log = {
     store.pushLog({ level: "PROVIDER", msg: `${name} ${model}`, timestamp: ts(), data });
   },
   info(msg: string): void {
-    store.pushLog({ level: "INFO", msg, timestamp: ts() });
+    store.pushLog({ level: "INFO", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
     writeFile("INFO", msg);
   },
   tool(name: string, args: Record<string, unknown>, provider?: string, tag?: string): void {
     const argsStr = Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
-    const provStr = provider ? ` @${provider}` : "";
+    const provStr = provider ? `[${provider}] ` : "";
     const tagStr = tag ? ` ${tag}` : "";
-    const msg = `${name}${provStr}${tagStr}${argsStr}`;
-    store.pushLog({ level: "TOOL", msg, timestamp: ts() });
+    const msg = `${provStr}${name}${tagStr}${argsStr}`;
+    store.pushLog({ level: "TOOL", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
     writeFile("TOOL", msg);
   },
   result(msg: string): void {
-    store.pushLog({ level: "RESULT", msg, timestamp: ts() });
+    store.pushLog({ level: "RESULT", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
     writeFile("RESULT", msg);
   },
   warn(msg: string): void {
-    store.pushLog({ level: "WARN", msg, timestamp: ts() });
+    store.pushLog({ level: "WARN", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
     writeFile("WARN", msg);
   },
   error(msg: string): void {
@@ -62,11 +64,13 @@ export const log = {
     writeFile("CAPTCHA", msg);
   },
   agent(msg: string): void {
+    if (activeGroupId) store.endGroup(activeGroupId);
+    activeGroupId = store.startGroup();
     store.pushLog({ level: "AGENT", msg, timestamp: ts() });
     writeFile("AGENT", msg);
   },
   think(msg: string): void {
-    store.pushLog({ level: "THINK", msg, timestamp: ts() });
+    store.pushLog({ level: "THINK", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
     writeFile("THINK", msg);
   },
   element(detail: string, html: string): void {
@@ -90,14 +94,16 @@ export const log = {
   tokenTotal(): void {
     const { tokensIn, tokensOut } = store.status;
     const msg = `${tokensIn} in → ${tokensOut} out (${tokensIn + tokensOut} total)`;
-    store.pushLog({ level: "TOKEN", msg, timestamp: ts() });
+    store.pushLog({ level: "TOKEN", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
     writeFile("TOKEN", msg);
   },
   success(msg: string): void {
+    if (activeGroupId) { store.endGroup(activeGroupId); activeGroupId = null; }
     store.pushLog({ level: "DONE", msg, timestamp: ts() });
     writeFile("DONE", msg);
   },
   fail(msg: string): void {
+    if (activeGroupId) { store.endGroup(activeGroupId); activeGroupId = null; }
     store.pushLog({ level: "FAIL", msg, timestamp: ts() });
     writeFile("FAIL", msg);
   },

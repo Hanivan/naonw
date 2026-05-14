@@ -6,9 +6,10 @@ interface InputBarProps {
   onSubmit: (text: string) => void;
   onInterrupt: () => void;
   onKey: () => void;
+  onToggleGroup: () => void;
 }
 
-export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
+export function InputBar({ onSubmit, onInterrupt, onKey, onToggleGroup }: InputBarProps) {
   const [input, setInput] = useState("");
   const [lastInput, setLastInput] = useState("");
   const { isFocused } = useFocus({ id: "input", autoFocus: true });
@@ -17,6 +18,7 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
   useInput((char, key) => {
     if (key.ctrl && char === "c") { process.exit(130); return; }
     if (key.escape) { setInput(lastInput); focus("input"); onInterrupt(); return; }
+    if (key.ctrl && char === "g") { onToggleGroup(); return; }
     if (!isFocused) return;
     if (!key.upArrow && !key.downArrow && !key.pageUp && !key.pageDown && !key.home && !key.end) onKey();
   });
@@ -35,7 +37,7 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
         ? (
           <TextInput
             value={input}
-            onChange={setInput}
+            onChange={(val) => { if (!/\[<\d/.test(val)) setInput(val); }}
             onSubmit={(val) => { const t = val.trim(); setLastInput(t); setInput(""); onSubmit(t); }}
             showCursor
             focus={isFocused}

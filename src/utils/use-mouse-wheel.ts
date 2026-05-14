@@ -4,28 +4,31 @@ import { useStdin } from "ink";
 type Options = {
   onWheelUp: () => void;
   onWheelDown: () => void;
+  onLeftClick?: () => void;
 };
 
-export function useMouseWheel({ onWheelUp, onWheelDown }: Options) {
+export function useMouseWheel({ onWheelUp, onWheelDown, onLeftClick }: Options) {
   const { stdin } = useStdin();
   const upRef = useRef(onWheelUp);
   const downRef = useRef(onWheelDown);
+  const clickRef = useRef(onLeftClick);
   upRef.current = onWheelUp;
   downRef.current = onWheelDown;
+  clickRef.current = onLeftClick;
 
   useEffect(() => {
     process.stdout.write("\x1b[?1006h");
     process.stdout.write("\x1b[?1015h");
 
-    // Intercept stdin.emit so mouse sequences never reach Ink's input pipeline
-    // (prevents escape chars from being typed into TextInput).
     const origEmit = stdin.emit.bind(stdin);
     (stdin as unknown as { emit: typeof origEmit }).emit = function (event: string, ...args: unknown[]) {
       if (event === "data") {
         const str = (args[0] as Buffer).toString();
-        if (str.includes("[<64;") || str.includes("[<65;")) {
+        // Match any SGR mouse event (press M or release m)
+        if (/\[<\d+;\d+;\d+[Mm]/.test(str)) {
           if (str.includes("[<64;")) upRef.current();
           if (str.includes("[<65;")) downRef.current();
+          if (/\[<0;\d+;\d+M/.test(str)) clickRef.current?.();
           return false;
         }
       }

@@ -27,6 +27,18 @@ export class BrowserManager {
     return this.page;
   }
 
+  async relaunch(headless: boolean): Promise<Page> {
+    const url = this.page?.url();
+    const cookies = this.page ? await this.page.cookies().catch(() => []) : [];
+    await this.close();
+    const page = await this.launch(headless);
+    if (url && url !== "about:blank") {
+      await page.goto(url, { waitUntil: "load", timeout: 30000 }).catch(() => {});
+      if (cookies.length) await page.setCookie(...cookies).catch(() => {});
+    }
+    return page;
+  }
+
   async close(): Promise<void> {
     if (this.browser) {
       await this.browser.close();

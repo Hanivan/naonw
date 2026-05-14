@@ -33,6 +33,7 @@ export type LogEntry = {
   msg: string;
   timestamp: string;
   data?: ProviderData;
+  groupId?: string;
 };
 
 export type AgentStatus = "idle" | "thinking" | "tool" | "done" | "interrupted";
@@ -74,6 +75,23 @@ const MAX_LOGS = 2000;
 class Store extends EventEmitter {
   logs: LogEntry[] = [];
   status: Status = { ...DEFAULT_STATUS };
+  collapsedGroups: Set<string> = new Set();
+  private _groupCounter = 0;
+
+  startGroup(): string {
+    return `g${++this._groupCounter}`;
+  }
+
+  endGroup(id: string): void {
+    this.collapsedGroups.add(id);
+    this.emit("log");
+  }
+
+  toggleGroup(id: string): void {
+    if (this.collapsedGroups.has(id)) this.collapsedGroups.delete(id);
+    else this.collapsedGroups.add(id);
+    this.emit("log");
+  }
 
   pushLog(entry: LogEntry): void {
     this.logs.push(entry);

@@ -93,32 +93,114 @@ function ProviderEntry({ entry }: { entry: LogEntry }) {
   );
 }
 
+// ── Collapsed group line ───────────────────────────────────────────────────────
+function CollapsedGroupLine({ count, isSelected }: { groupId: string; count: number; isSelected: boolean }) {
+  const label = `↳ ${count} step${count !== 1 ? "s" : ""}`;
+  return (
+    <Box flexDirection="row" marginLeft={2}>
+      <Text dimColor color={isSelected ? "cyan" : undefined} bold={isSelected}>
+        {label}
+      </Text>
+      {isSelected && <Text dimColor color="gray">  [ctrl+g / enter to expand]</Text>}
+    </Box>
+  );
+}
+
+// ── Render item types ─────────────────────────────────────────────────────────
+type RenderItem =
+  | { type: "entry"; entry: LogEntry; key: number }
+  | { type: "collapsed"; groupId: string; count: number }
+  | { type: "group-footer"; groupId: string };
+
+function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>): RenderItem[] {
+  const seenGroups = new Set<string>();
+  const expandedGroups = new Set<string>();
+  const groupCounts = new Map<string, number>();
+  for (const e of logs) {
+    if (e.groupId) groupCounts.set(e.groupId, (groupCounts.get(e.groupId) ?? 0) + 1);
+  }
+
+  const result: RenderItem[] = [];
+  let idx = 0;
+  for (let i = 0; i < logs.length; i++) {
+    const entry = logs[i]!;
+    const gid = entry.groupId;
+    if (!gid) {
+      result.push({ type: "entry", entry, key: idx++ });
+      continue;
+    }
+    if (collapsedGroups.has(gid)) {
+      if (!seenGroups.has(gid)) {
+        seenGroups.add(gid);
+        result.push({ type: "collapsed", groupId: gid, count: groupCounts.get(gid) ?? 0 });
+        idx++;
+      }
+    } else {
+      expandedGroups.add(gid);
+      result.push({ type: "entry", entry, key: idx++ });
+      // inject footer after the last entry of this group
+      const nextGid = logs[i + 1]?.groupId;
+      if (nextGid !== gid) {
+        result.push({ type: "group-footer", groupId: gid });
+      }
+    }
+  }
+  return result;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 interface LogPaneProps {
   logs: LogEntry[];
   paneHeight: number;
   scrollRef: React.RefObject<ScrollViewRef | null>;
+  collapsedGroups: Set<string>;
+  selectedGroupId: string | null;
 }
 
-function renderEntry(entry: LogEntry, idx: number) {
+function renderEntry(entry: LogEntry, key: number) {
   if (!IS_FANCY) {
     return (
-      <Box key={idx} flexDirection="row">
+      <Box key={key} flexDirection="row">
         <Text color={OLD_COLOR[entry.level] ?? "white"} bold>{`● ${padLevel(entry.level)} `}</Text>
         <Text wrap="wrap">{entry.msg}</Text>
       </Box>
     );
   }
-  if (entry.level === "BRAND") return <BrandEntry key={idx} />;
-  if (entry.level === "PROVIDER") return <ProviderEntry key={idx} entry={entry} />;
-  return <FancyEntry key={idx} entry={entry} />;
+  if (entry.level === "BRAND") return <BrandEntry key={key} />;
+  if (entry.level === "PROVIDER") return <ProviderEntry key={key} entry={entry} />;
+  return <FancyEntry key={key} entry={entry} />;
 }
 
-export function LogPane({ logs, paneHeight, scrollRef }: LogPaneProps) {
+export function LogPane({ logs, paneHeight, scrollRef, collapsedGroups, selectedGroupId }: LogPaneProps) {
+  const items = buildRenderItems(logs, collapsedGroups);
+
+  let lastGroupId: string | null = null;
+  for (const e of logs) if (e.groupId) lastGroupId = e.groupId;
+
   return (
     <Box height={paneHeight} flexDirection="column">
       <ScrollView ref={scrollRef}>
-        {logs.map(renderEntry)}
+        {items.map((item) => {
+          if (item.type === "collapsed") {
+            return (
+              <CollapsedGroupLine
+                key={`cg-${item.groupId}`}
+                groupId={item.groupId}
+                count={item.count}
+                isSelected={item.groupId === selectedGroupId}
+              />
+            );
+          }
+          if (item.type === "group-footer") {
+            if (item.groupId !== lastGroupId) return null;
+            return (
+              <Box key={`gf-${item.groupId}`} marginLeft={2}>
+                <Text dimColor color="gray">[ctrl+g to collapse]</Text>
+              </Box>
+            );
+          }
+          return renderEntry(item.entry, item.key);
+        })}
       </ScrollView>
     </Box>
   );

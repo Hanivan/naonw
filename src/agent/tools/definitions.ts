@@ -96,6 +96,16 @@ export const toolDefinitions: ToolDefinition[] = [
     },
   },
   {
+    name: "closePage",
+    description: "Close the current browser tab/page",
+    parameters: { type: "object", required: [], properties: {} },
+  },
+  {
+    name: "closeBrowser",
+    description: "Close the entire browser instance",
+    parameters: { type: "object", required: [], properties: {} },
+  },
+  {
     name: "done",
     description: "Signal that the task is complete",
     parameters: {

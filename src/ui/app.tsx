@@ -18,10 +18,11 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
 
   const [logs, setLogs] = useState<LogEntry[]>([...store.logs]);
   const [status, setStatus] = useState<Status>({ ...store.status });
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(store.collapsedGroups));
   const logPanelRef = useRef<LogPanelRef>(null);
 
   useEffect(() => {
-    const onLog = () => setLogs([...store.logs]);
+    const onLog = () => { setLogs([...store.logs]); setCollapsedGroups(new Set(store.collapsedGroups)); };
     const onStatus = () => setStatus({ ...store.status });
     store.on("log", onLog);
     store.on("status", onStatus);
@@ -34,11 +35,21 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
     logPanelRef.current?.scrollToBottom();
   }, []);
 
+  const handleToggleLastGroup = useCallback(() => {
+    const seen = new Set<string>();
+    let lastGroup: string | undefined;
+    for (const e of store.logs) {
+      if (e.groupId && !seen.has(e.groupId)) { seen.add(e.groupId); lastGroup = e.groupId; }
+    }
+    if (lastGroup) store.toggleGroup(lastGroup);
+  }, []);
+
   return (
     <Box flexDirection="column" width="100%" height={rows}>
-      <LogPanel ref={logPanelRef} logs={logs} paneHeight={paneHeight} />
+      <LogPanel ref={logPanelRef} logs={logs} paneHeight={paneHeight}
+                collapsedGroups={collapsedGroups} onToggleGroup={(id: string) => store.toggleGroup(id)} />
       <TimerBar status={status} />
-      <InputBar onSubmit={onSubmit} onInterrupt={onInterrupt} onKey={handleKey} />
+      <InputBar onSubmit={onSubmit} onInterrupt={onInterrupt} onKey={handleKey} onToggleGroup={handleToggleLastGroup} />
       <StatusLine status={status} />
     </Box>
   );

@@ -27,11 +27,11 @@ export function StatusLine({ status }: StatusLineProps) {
       overflow="hidden"
     >
       <Box gap={3}>
-        <Text dimColor>MDL <Text color="cyan">{providerLabel}</Text></Text>
-        <Text dimColor>URL <Text color="yellow">{urlDisplay}</Text></Text>
-        <Text dimColor>ITER <Text color="magenta">{status.iteration}<Text dimColor>/{status.maxIterations}</Text></Text></Text>
-        <Text dimColor>TKN <Text color="blue">↑{status.tokensIn}</Text><Text dimColor> </Text><Text color="green">↓{status.tokensOut}</Text><Text dimColor> Σ{totalTokens}</Text></Text>
-        <Text dimColor>BROWSER <Text color={status.browserOpen ? "green" : "gray"}>{status.browserOpen ? "● open" : "○ closed"}</Text></Text>
+        <Text color="gray">MDL <Text color="cyan">{providerLabel}</Text></Text>
+        <Text color="gray">URL <Text color="yellow">{urlDisplay}</Text></Text>
+        <Text color="gray">ITER <Text color="magenta">{status.iteration}</Text><Text color="gray">/{status.maxIterations}</Text></Text>
+        <Text color="gray">TKN <Text color="blue">↑{status.tokensIn}</Text><Text color="gray"> </Text><Text color="green">↓{status.tokensOut}</Text><Text color="gray"> Σ{totalTokens}</Text></Text>
+        <Text color="gray">BROWSER <Text color={status.browserOpen ? "green" : "gray"}>{status.browserOpen ? "● open" : "○ closed"}</Text></Text>
       </Box>
     </Box>
   );

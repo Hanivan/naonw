@@ -33,12 +33,13 @@ export async function runAgentLoop(
   signal?: AbortSignal,
   waitForInput?: () => Promise<string>,
 ): Promise<AgentResult> {
+  let currentHeadless = headless;
   let page: Page | null = browser.isLaunched() ? browser.getPage() : null;
 
   async function ensurePage(): Promise<Page> {
     if (!page) {
       log.info("Launching browser...");
-      page = await browser.launch(headless);
+      page = await browser.launch(currentHeadless);
       store.setStatus({ browserOpen: true });
     }
     return page;
@@ -87,10 +88,22 @@ export async function runAgentLoop(
         log.captcha("CAPTCHA detected — injecting solveCaptcha hint for AI");
         ai.addUser("CAPTCHA is visible. Call solveCaptcha() to get a screenshot and challenge text, then clickCaptchaTile() to select matching tiles.");
       } else {
+        if (currentHeadless) {
+          log.captcha("CAPTCHA detected — relaunching browser as visible...");
+          page = await browser.relaunch(false);
+          currentHeadless = false;
+          needFullSnapshot = true;
+        }
         log.captcha("Solve it in the browser, then press Enter to continue...");
         if (waitForInput) await waitForInput();
         else await waitForEnter();
+        if (currentHeadless !== headless) {
+          log.captcha(`Switching back to ${headless ? "headless" : "visible"}...`);
+          page = await browser.relaunch(headless);
+          currentHeadless = headless;
+        }
         log.captcha("Resuming...");
+        needFullSnapshot = true;
       }
     }
 
@@ -179,6 +192,26 @@ export async function runAgentLoop(
       lastToolAction = actionKey;
 
       if (call.name !== "done") log.tool(call.name, call.arguments, response.provider);
+
+      if (call.name === "closePage") {
+        store.setStatus({ agentStatus: "tool" });
+        if (page) { await page.close(); page = null; }
+        prevNodes = []; refCache = new Map(); needFullSnapshot = true;
+        log.result("Page closed");
+        ai.addToolResult(call.name, "Page closed");
+        continue;
+      }
+
+      if (call.name === "closeBrowser") {
+        store.setStatus({ agentStatus: "tool" });
+        await browser.close();
+        page = null;
+        prevNodes = []; refCache = new Map(); needFullSnapshot = true;
+        store.setStatus({ browserOpen: false });
+        log.result("Browser closed");
+        ai.addToolResult(call.name, "Browser closed");
+        continue;
+      }
 
       if (BROWSER_TOOLS.has(call.name)) page = await ensurePage();
       store.setStatus({ agentStatus: "tool" });

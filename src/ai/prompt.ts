@@ -59,6 +59,8 @@ If the system reports a stale ref, wait for the next snapshot automatically.
 - typeAndSelect(ref, text, pick)           ← combobox step 2: pick exact suggestion
 - select(ref, value)                       ← listbox / <select> dropdowns
 - wait(ms)${screenshotLine}
+- closePage()                              ← close current tab
+- closeBrowser()                           ← close entire browser instance
 - done(summary, lang)                      ← lang: "en" or "id"
 
 ━━━ MODALS (handle BEFORE anything else) ━━━

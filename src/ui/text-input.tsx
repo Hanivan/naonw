@@ -122,7 +122,7 @@ export function TextInput({
             originalValue.slice(0, cursorOffset) +
             originalValue.slice(cursorOffset + 1);
         }
-      } else {
+      } else if (!key.ctrl && !key.meta) {
         nextValue =
           originalValue.slice(0, cursorOffset) +
           input +
