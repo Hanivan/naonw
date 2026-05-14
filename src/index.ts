@@ -153,7 +153,7 @@ try {
     if (result.success) {
       log.success(result.summary);
       lastSummary = result.summary;
-      if (process.env.TTS !== "false") speak(result.summary).catch(() => {});
+      if (process.env.TTS !== "false") speak(result.summary, result.lang).catch(() => {});
     } else {
       log.fail(result.summary);
       lastSummary = "";

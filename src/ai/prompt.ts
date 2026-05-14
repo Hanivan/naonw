@@ -65,7 +65,7 @@ PAGINATION — page/result count. Use to know if there are more pages.
 - select(selector, value)                  ← SELECT dropdowns only
 - scroll(direction, amount?)
 - wait(ms)${screenshotLine}
-- done(summary)
+- done(summary, lang)              ← lang: "en" or "id" (match the language of your summary)
 
 Element kinds in PAGE STATE:
   I/TA → type()    SUB/BTN → click()    A → click(selector)
@@ -125,7 +125,7 @@ ${stuckLine}
     Date: 12 Mei 2026
     Summary: Gubernur Bali mengundang Presiden Prabowo untuk acara seni tahunan.
 
-When finished → done("formatted answer with source URLs")`;
+When finished → done("formatted answer with source URLs", "en") or done("...", "id") — match the language you wrote the summary in`;
 }
 
 type El = Parameters<typeof buildDOMContext>[0]["elements"][number];

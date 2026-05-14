@@ -7,5 +7,5 @@ export async function screenshot(page: Page): Promise<ToolResult> {
 }
 
 export async function done(_page: Page, args: Record<string, unknown>): Promise<ToolResult> {
-  return { text: `DONE: ${args.summary as string}` };
+  return { text: `DONE: ${args.summary as string}`, lang: args.lang as string | undefined };
 }

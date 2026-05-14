@@ -115,9 +115,10 @@ export const toolDefinitions: ToolDefinition[] = [
     description: "Signal that the task is complete",
     parameters: {
       type: "object",
-      required: ["summary"],
+      required: ["summary", "lang"],
       properties: {
         summary: { type: "string", description: "Summary of what was accomplished" },
+        lang: { type: "string", enum: ["en", "id"], description: "Language of the summary: 'en' for English, 'id' for Bahasa Indonesia" },
       },
     },
   },

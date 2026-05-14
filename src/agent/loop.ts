@@ -16,6 +16,7 @@ const MAX_CONSECUTIVE_SCROLLS = 3;
 export interface AgentResult {
   success: boolean;
   summary: string;
+  lang?: string;
 }
 
 const BROWSER_TOOLS = new Set(["navigate", "click", "type", "typeAndSelect", "select", "scroll", "wait", "screenshot", "solveCaptcha", "clickCaptchaTile"]);
@@ -225,6 +226,7 @@ export async function runAgentLoop(
         return {
           success: true,
           summary: (call.arguments.summary as string) ?? result.text,
+          lang: result.lang ?? (call.arguments.lang as string | undefined),
         };
       }
     }
