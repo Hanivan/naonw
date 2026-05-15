@@ -41,6 +41,40 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     return result;
   }, [logs]);
 
+  type TaskInfo = {
+    groupId: string;
+    index: number;
+    prompt: string;
+    status: "running" | "done" | "failed";
+    entries: LogEntry[];
+  };
+
+  const _tasks = useMemo<TaskInfo[]>(() => {
+    const result: TaskInfo[] = [];
+    let current: TaskInfo | null = null;
+    for (const e of logs) {
+      if (e.level === "AGENT") {
+        if (current) result.push(current);
+        const firstLine = e.msg.split("\n")[0] ?? e.msg;
+        current = {
+          groupId: e.groupId ?? `agent-${result.length}`,
+          index: result.length + 1,
+          prompt: firstLine,
+          status: "running",
+          entries: [e],
+        };
+        continue;
+      }
+      if (current) {
+        current.entries.push(e);
+        if (e.level === "DONE") current.status = "done";
+        else if (e.level === "FAIL") current.status = "failed";
+      }
+    }
+    if (current) result.push(current);
+    return result;
+  }, [logs]);
+
   let lastGroupId: string | null = null;
   for (const e of logs) if (e.groupId) lastGroupId = e.groupId;
 
