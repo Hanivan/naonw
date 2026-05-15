@@ -63,58 +63,6 @@ function FancyEntry({ entry }: { entry: LogEntry }) {
   );
 }
 
-// ── Collapsed group line ───────────────────────────────────────────────────────
-function CollapsedGroupLine({ count, isSelected }: { groupId: string; count: number; isSelected: boolean }) {
-  const label = `↳ ${count} step${count !== 1 ? "s" : ""}`;
-  return (
-    <Box flexDirection="row" marginLeft={2}>
-      <Text color={isSelected ? "cyan" : undefined} bold={isSelected} dimColor={!isSelected}>
-        {label}
-      </Text>
-      {isSelected && <Text dimColor color="gray">  [ctrl+g / enter to expand]</Text>}
-    </Box>
-  );
-}
-
-// ── Render item types ─────────────────────────────────────────────────────────
-export type RenderItem =
-  | { type: "entry"; entry: LogEntry; key: number }
-  | { type: "collapsed"; groupId: string; count: number }
-  | { type: "group-footer"; groupId: string };
-
-export function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>): RenderItem[] {
-  const seenGroups = new Set<string>();
-  const groupCounts = new Map<string, number>();
-  for (const e of logs) {
-    if (e.groupId) groupCounts.set(e.groupId, (groupCounts.get(e.groupId) ?? 0) + 1);
-  }
-
-  const result: RenderItem[] = [];
-  let idx = 0;
-  for (let i = 0; i < logs.length; i++) {
-    const entry = logs[i]!;
-    const gid = entry.groupId;
-    if (!gid) {
-      result.push({ type: "entry", entry, key: idx++ });
-      continue;
-    }
-    if (collapsedGroups.has(gid)) {
-      if (!seenGroups.has(gid)) {
-        seenGroups.add(gid);
-        result.push({ type: "collapsed", groupId: gid, count: groupCounts.get(gid) ?? 0 });
-        idx++;
-      }
-    } else {
-      result.push({ type: "entry", entry, key: idx++ });
-      const nextGid = logs[i + 1]?.groupId;
-      if (nextGid !== gid) {
-        result.push({ type: "group-footer", groupId: gid });
-      }
-    }
-  }
-  return result;
-}
-
 // ── Entry renderer ────────────────────────────────────────────────────────────
 export function renderEntry(entry: LogEntry, key: number) {
   if (!IS_FANCY) {
@@ -126,45 +74,4 @@ export function renderEntry(entry: LogEntry, key: number) {
     );
   }
   return <FancyEntry key={key} entry={entry} />;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
-interface LogPaneProps {
-  items: RenderItem[];
-  scrollTop: number;
-  paneHeight: number;
-  selectedGroupId: string | null;
-  lastGroupId: string | null;
-}
-
-export function LogPane({ items, scrollTop, paneHeight, selectedGroupId, lastGroupId }: LogPaneProps) {
-  const visible = items.slice(scrollTop, scrollTop + paneHeight);
-  return (
-    <Box height={paneHeight} flexDirection="column" overflow="hidden">
-      {visible.map((item) => {
-        if (item.type === "collapsed") {
-          return (
-            <CollapsedGroupLine
-              key={`cg-${item.groupId}`}
-              groupId={item.groupId}
-              count={item.count}
-              isSelected={item.groupId === selectedGroupId}
-            />
-          );
-        }
-        if (item.type === "group-footer") {
-          if (item.groupId !== lastGroupId && item.groupId !== selectedGroupId) return null;
-          const isSelected = item.groupId === selectedGroupId;
-          return (
-            <Box key={`gf-${item.groupId}`} marginLeft={2}>
-              <Text color={isSelected ? "cyan" : undefined} bold={isSelected} dimColor={!isSelected}>
-                {isSelected ? "[enter to collapse]" : "[ctrl+g to collapse]"}
-              </Text>
-            </Box>
-          );
-        }
-        return renderEntry(item.entry, item.key);
-      })}
-    </Box>
-  );
 }
