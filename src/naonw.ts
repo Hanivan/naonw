@@ -65,8 +65,9 @@ async function connect(tabId?: string): Promise<{ page: Page; close: () => Promi
 // ── Commands ─────────────────────────────────────────────────────────────────
 
 async function cmdGo(args: string[], flags: Flags) {
-  const url = args[0];
+  let url = args[0];
   if (!url) throw new Error("Usage: naonw go <url>");
+  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
   const { page, close } = await connect(flags.tab);
   await page.goto(url, { waitUntil: "networkidle0", timeout: flags.timeout });
   console.log(page.url());
