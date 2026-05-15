@@ -65,6 +65,10 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   const prevLiveIndexRef = useRef<number | null>(null);
 
   const tasks = useMemo<TaskInfo[]>(() => deriveTasks(logs), [logs]);
+  const tasksRef = useRef(tasks);
+  tasksRef.current = tasks;
+  const selectedIndexRef = useRef(selectedIndex);
+  selectedIndexRef.current = selectedIndex;
   const lastIndex = tasks.length === 0 ? null : tasks[tasks.length - 1]!.index;
   const liveIndex = tasks.length > 0 && tasks[tasks.length - 1]!.status === "running"
     ? tasks[tasks.length - 1]!.index
@@ -132,20 +136,23 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   useInput((char, key) => {
     if (!isFocusedRef.current) return;
 
+    const curTasks = tasksRef.current;
+    const curSelected = selectedIndexRef.current;
+
     // Task navigation: j/k
-    if (char === "j" && tasks.length > 0) {
-      const curIdx = selectedIndex ?? tasks[0]!.index;
-      const pos = tasks.findIndex((t) => t.index === curIdx);
-      const next = tasks[(pos + 1) % tasks.length]!.index;
+    if (char === "j" && curTasks.length > 0) {
+      const curIdx = curSelected ?? curTasks[0]!.index;
+      const pos = curTasks.findIndex((t) => t.index === curIdx);
+      const next = curTasks[(pos + 1) % curTasks.length]!.index;
       atBottomRef.current = true;
       setScrollOffset(0);
       setSelectedIndex(next);
       return;
     }
-    if (char === "k" && tasks.length > 0) {
-      const curIdx = selectedIndex ?? tasks[0]!.index;
-      const pos = tasks.findIndex((t) => t.index === curIdx);
-      const prev = tasks[(pos - 1 + tasks.length) % tasks.length]!.index;
+    if (char === "k" && curTasks.length > 0) {
+      const curIdx = curSelected ?? curTasks[0]!.index;
+      const pos = curTasks.findIndex((t) => t.index === curIdx);
+      const prev = curTasks[(pos - 1 + curTasks.length) % curTasks.length]!.index;
       atBottomRef.current = true;
       setScrollOffset(0);
       setSelectedIndex(prev);
