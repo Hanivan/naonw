@@ -27,6 +27,8 @@ bun src/index.ts "search the latest iPhone price on tokopedia"
 
 ### 1. AI agent — `bun src/index.ts "<task>"`
 
+<img width="1919" height="1048" alt="image" src="https://github.com/user-attachments/assets/51de056d-a8fc-4b81-91b1-8596e209bedb" />
+
 Tell it what to do. It reads the page, calls tools, finishes with a spoken summary.
 
 ```bash
@@ -38,6 +40,8 @@ bun src/index.ts "what is the prayer schedule in Bogor today"
 → See [docs/features/ai-agent.md](docs/features/ai-agent.md) for the full tool list, vision/thinking modes, and resilience model.
 
 ### 2. `naonw` CLI — direct browser control, no AI
+
+<img width="1919" height="1047" alt="image" src="https://github.com/user-attachments/assets/fe65cfe3-f195-4086-b510-082265f9eb80" />
 
 Tag-prefixed greppable output. `[GO]`, `[OK]`, `[SHOT]`, `[SNAP]`, `[TEXT]`, `[JS]`, `[TAB ...]`.
 
