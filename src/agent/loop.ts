@@ -42,7 +42,7 @@ export async function runAgentLoop(
       const cdpUrl = process.env.NAONW_CDP_URL;
       log.info(cdpUrl ? "Connecting via CDP..." : "Launching browser...");
       page = await browser.connectOrLaunch(currentHeadless);
-      store.setStatus({ browserOpen: true });
+      store.setStatus({ browserOpen: true, browserMode: browser.isCdp() ? "cdp" : "launched" });
     }
     return page;
   }
@@ -213,7 +213,7 @@ export async function runAgentLoop(
         await browser.close();
         page = null;
         prevNodes = []; refCache = new Map(); needFullSnapshot = true;
-        store.setStatus({ browserOpen: false });
+        store.setStatus({ browserOpen: false, browserMode: null });
         log.result(result.text);
         ai.addToolResult(call.name, result.text);
         continue;

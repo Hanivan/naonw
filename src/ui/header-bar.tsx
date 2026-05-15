@@ -83,7 +83,7 @@ export function HeaderBar({ status, providers }: HeaderBarProps) {
         <Text color="gray" dimColor>URL <Text color="yellow">{urlDisplay}</Text></Text>
         <Text color="gray" dimColor>│</Text>
         <Text color={status.browserOpen ? "green" : "gray"} dimColor={!status.browserOpen}>
-          {status.browserOpen ? "● browser" : "○ browser"}
+          {status.browserOpen ? `● browser ${status.browserMode === "cdp" ? "(cdp)" : "(launched)"}` : "○ browser"}
         </Text>
       </Box>
       {/* Row 2: live agent state */}

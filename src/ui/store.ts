@@ -50,6 +50,7 @@ export type Status = {
   tokensOut: number;
   currentUrl: string;
   browserOpen: boolean;
+  browserMode: "cdp" | "launched" | null;
   promptLabel: string;
   agentStartTime: number;
   supportsVision: boolean;
@@ -66,6 +67,7 @@ const DEFAULT_STATUS: Status = {
   tokensOut: 0,
   currentUrl: "",
   browserOpen: false,
+  browserMode: null,
   promptLabel: "Task",
   agentStartTime: 0,
   supportsVision: false,
