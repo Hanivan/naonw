@@ -113,14 +113,12 @@ Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 }
 
 export async function speak(text: string, lang = "en"): Promise<void> {
-  log.debug(
-    JSON.stringify({
-      text: text.slice(0, 10),
-      lang,
-    }),
-  );
+  log.debug(JSON.stringify({ text: text.slice(0, 10), lang }));
   if (process.env["GEMINI_API_KEY"]) {
-    return speakGemini(text);
+    const ok = await speakGemini(text);
+    if (ok) return;
+    // Gemini failed (quota, network, no audio, paplay missing) — fall back.
+    log.info("Falling back to local TTS");
   }
   return speakLocal(text, lang);
 }

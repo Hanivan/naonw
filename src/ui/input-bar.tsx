@@ -59,8 +59,8 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
                 ? "Enter (empty): resolve captcha  ·  text+Enter: queue task  ·  Esc: abort"
                 : "Tab: type mode to resolve captcha  ·  Esc: abort")
             : isFocused
-              ? "Tab: scroll mode  ·  Esc: interrupt"
-              : "j/k: select task  ·  ↑↓ PgUp PgDn Home End: scroll  ·  d: delete queued  ·  Tab: type mode"}
+              ? "Tab: panels  ·  Esc: interrupt"
+              : "Tab: cycle panels  ·  TASKS: j/k select, d delete  ·  LOG: j/k scroll, g/G top/bottom, PgUp/Dn"}
         </Text>
       </Box>
     </Box>

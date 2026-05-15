@@ -19,9 +19,13 @@ function summarizeGeminiError(err: unknown): string {
   return msg;
 }
 
-export async function speakGemini(text: string): Promise<void> {
+/**
+ * Returns true if audio was successfully synthesized AND played.
+ * Returns false on any failure — caller should fall back to local TTS.
+ */
+export async function speakGemini(text: string): Promise<boolean> {
   const apiKey = process.env["GEMINI_API_KEY"];
-  if (!apiKey || !text.trim()) return;
+  if (!apiKey || !text.trim()) return false;
 
   const ai = new GoogleGenAI({ apiKey });
 
@@ -39,20 +43,27 @@ export async function speakGemini(text: string): Promise<void> {
     });
   } catch (err) {
     log.warn(`Gemini TTS failed — ${summarizeGeminiError(err)}`);
-    return;
+    return false;
   }
 
   const data = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
   if (!data) {
     log.warn("Gemini TTS returned no audio");
-    return;
+    return false;
   }
 
   const pcm = Buffer.from(data, "base64");
-  const player = spawn("paplay", ["--raw", "--rate=24000", "--channels=1", "--format=s16le"], {
-    stdio: ["pipe", "ignore", "ignore"],
+  return await new Promise<boolean>((resolve) => {
+    let settled = false;
+    const settle = (ok: boolean) => { if (!settled) { settled = true; resolve(ok); } };
+    const player = spawn("paplay", ["--raw", "--rate=24000", "--channels=1", "--format=s16le"], {
+      stdio: ["pipe", "ignore", "ignore"],
+    });
+    player.on("error", (e: Error) => {
+      log.warn(`Gemini TTS player failed — ${e.message}`);
+      settle(false);
+    });
+    player.once("close", (code) => settle(code === 0));
+    (player.stdin as NodeJS.WritableStream).end(pcm);
   });
-  player.on("error", (e: Error) => console.error("paplay error:", e.message));
-  (player.stdin as NodeJS.WritableStream).end(pcm);
-  await new Promise<void>((resolve) => player.once("close", resolve));
 }

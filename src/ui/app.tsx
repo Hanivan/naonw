@@ -18,7 +18,7 @@ interface AppProps {
 }
 
 export function App({ onSubmit, onInterrupt }: AppProps) {
-  const { rows } = useWindowSize();
+  const { rows, columns } = useWindowSize();
 
   const [logs, setLogs] = useState<LogEntry[]>([...store.logs]);
   const [status, setStatus] = useState<Status>({ ...store.status });
@@ -52,7 +52,7 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
   return (
     <Box flexDirection="column" width="100%" height={rows} overflow="hidden">
       <HeaderBar status={status} providers={providers} />
-      <LogPanel ref={logPanelRef} logs={logs} paneHeight={mainHeight} queued={queued} />
+      <LogPanel ref={logPanelRef} logs={logs} paneHeight={mainHeight} paneWidth={columns} queued={queued} />
       <InputBar onSubmit={onSubmit} onInterrupt={onInterrupt} onKey={handleKey} />
     </Box>
   );

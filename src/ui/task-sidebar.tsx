@@ -1,5 +1,6 @@
-import { Box, Text } from "ink";
+import { Box, Text, useFocus, useInput } from "ink";
 import type { QueuedMessage } from "@/ui/store.ts";
+import { store } from "@/ui/store.ts";
 
 export type TaskStatus = "running" | "done" | "failed";
 
@@ -15,7 +16,8 @@ interface Props {
   selectedIndex: number | null;
   selectedQueueId: string | null;
   width: number;
-  isFocused: boolean;
+  onSelectTask: (index: number) => void;
+  onSelectQueue: (id: string) => void;
 }
 
 const STATUS_ICON: Record<TaskStatus, string> = {
@@ -35,11 +37,63 @@ function truncate(s: string, max: number): string {
   return s.slice(0, Math.max(0, max - 1)) + "…";
 }
 
-export function TaskSidebar({ tasks, queued, selectedIndex, selectedQueueId, width, isFocused }: Props) {
+export function TaskSidebar({
+  tasks, queued, selectedIndex, selectedQueueId, width,
+  onSelectTask, onSelectQueue,
+}: Props) {
+  const { isFocused } = useFocus({ id: "tasks" });
+
+  type Slot = { kind: "task"; index: number } | { kind: "queue"; id: string };
+  const slots: Slot[] = [
+    ...tasks.map((t): Slot => ({ kind: "task", index: t.index })),
+    ...queued.map((q): Slot => ({ kind: "queue", id: q.id })),
+  ];
+
+  useInput((char, key) => {
+    if (slots.length === 0) return;
+
+    function pos(): number {
+      if (selectedQueueId !== null) {
+        const i = slots.findIndex((s) => s.kind === "queue" && s.id === selectedQueueId);
+        if (i >= 0) return i;
+      }
+      if (selectedIndex !== null) {
+        const i = slots.findIndex((s) => s.kind === "task" && s.index === selectedIndex);
+        if (i >= 0) return i;
+      }
+      return -1;
+    }
+
+    function apply(slot: Slot) {
+      if (slot.kind === "task") onSelectTask(slot.index);
+      else onSelectQueue(slot.id);
+    }
+
+    if (char === "j" || key.downArrow) {
+      const p = pos();
+      apply(slots[((p < 0 ? -1 : p) + 1 + slots.length) % slots.length]!);
+      return;
+    }
+    if (char === "k" || key.upArrow) {
+      const p = pos();
+      apply(slots[((p < 0 ? slots.length : p) - 1 + slots.length) % slots.length]!);
+      return;
+    }
+    if ((char === "d" || key.delete) && selectedQueueId !== null) {
+      const id = selectedQueueId;
+      const removedIdx = slots.findIndex((s) => s.kind === "queue" && s.id === id);
+      store.removeQueued(id);
+      const next = slots.filter((_s, i) => i !== removedIdx);
+      if (next.length > 0) apply(next[Math.min(removedIdx, next.length - 1)]!);
+      return;
+    }
+  }, { isActive: isFocused });
+
   const taskDigits = tasks.length === 0 ? 1 : String(tasks.length).length;
   const queueIdLen = queued.reduce((m, q) => Math.max(m, q.id.length), 0);
   const indexDigits = Math.max(taskDigits, queueIdLen);
   const promptWidth = Math.max(4, width - 5 - indexDigits);
+
   return (
     <Box flexDirection="column" width={width} paddingX={1}>
       <Box marginBottom={1}>
