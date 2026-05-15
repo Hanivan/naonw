@@ -19,6 +19,7 @@ bun src/index.ts "search the latest iPhone price on tokopedia"
 - [Provider priority](#provider-priority)
 - [Project layout](#project-layout)
 - [Development](#development)
+- [Credits](#credits)
 
 ---
 
@@ -99,3 +100,14 @@ bun tsc --noEmit               # typecheck
 ```
 
 Logs land in `logs/run.log` and `logs/ai-context.log` (truncated each session). For tuning prompt behavior or debugging model decisions, `tail -f logs/ai-context.log` is the fastest path.
+
+---
+
+## Credits
+
+Built standing on the shoulders of:
+
+- **[runablehq/mini-browser](https://github.com/runablehq/mini-browser)** — `mb`, a Unix-style browser CLI for agents. Inspiration for the `naonw` CLI's tag-prefixed, pipe-friendly output style.
+- **[CloakHQ/CloakBrowser](https://github.com/CloakHQ/CloakBrowser)** — stealth Chromium with source-level fingerprint patches. Powers the launched-browser path so Naonw passes bot-detection on real sites.
+
+Thanks for doing the hard parts.
