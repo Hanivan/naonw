@@ -55,7 +55,9 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
       <Box paddingX={2}>
         <Text dimColor color="gray">
           {captchaPending
-            ? "Enter (empty): resolve captcha  ·  text+Enter: queue task  ·  Esc: abort"
+            ? (isFocused
+                ? "Enter (empty): resolve captcha  ·  text+Enter: queue task  ·  Esc: abort"
+                : "Tab: type mode to resolve captcha  ·  Esc: abort")
             : isFocused
               ? "Tab: scroll mode  ·  Esc: interrupt"
               : "j/k: select task  ·  ↑↓ PgUp PgDn Home End: scroll  ·  d: delete queued  ·  Tab: type mode"}

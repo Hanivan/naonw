@@ -77,6 +77,7 @@ function handleInterrupt(): void {
   // Resolve any pending waiter with empty string so the loop unblocks.
   if (followUpResolve) { const r = followUpResolve; followUpResolve = null; r(""); }
   if (captchaResolve) { const r = captchaResolve; captchaResolve = null; r(); }
+  else if (store.captchaPending) store.setCaptchaPending(false);
 }
 
 // ── Browser + AI ──────────────────────────────────────────
