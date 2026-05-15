@@ -54,6 +54,20 @@ export class BrowserManager {
     return this.page;
   }
 
+  /** After closing the active page, pick another open tab from the same browser (CDP case). */
+  async adoptAnotherPage(): Promise<Page | null> {
+    if (!this.browser) return null;
+    try {
+      const pages = await this.browser.pages();
+      const next = pages.find((p) => !p.isClosed());
+      if (next) {
+        this.page = next;
+        return next;
+      }
+    } catch {}
+    return null;
+  }
+
   async relaunch(headless: boolean): Promise<Page> {
     if (this._cdp) return this.getPage(); // can't relaunch an external CDP session
     const url = this.page?.url();
@@ -67,16 +81,30 @@ export class BrowserManager {
     return page;
   }
 
-  async close(): Promise<void> {
-    if (this.browser) {
-      if (this._cdp) {
-        this.browser.disconnect();
+  /**
+   * Close the browser and detach. For CDP, prefer disconnect (leave the user's
+   * Chrome alive). When `force=true` (e.g. agent called closeBrowser()), close
+   * all pages we own and ALSO terminate Chrome via the Browser.close CDP method.
+   */
+  async close(force = false): Promise<void> {
+    if (!this.browser) return;
+    if (this._cdp) {
+      if (force) {
+        // Close all pages first so Browser.close has a clean exit
+        try {
+          const pages = await this.browser.pages();
+          await Promise.all(pages.map((p) => p.close().catch(() => {})));
+        } catch {}
+        // browser.close() for a CDP-attached browser sends Browser.close — actually closes Chrome
+        try { await this.browser.close(); } catch { try { this.browser.disconnect(); } catch {} }
       } else {
-        await this.browser.close();
+        try { this.browser.disconnect(); } catch {}
       }
-      this.browser = null;
-      this.page = null;
-      this._cdp = false;
+    } else {
+      try { await this.browser.close(); } catch {}
     }
+    this.browser = null;
+    this.page = null;
+    this._cdp = false;
   }
 }

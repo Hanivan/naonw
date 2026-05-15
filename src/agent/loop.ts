@@ -252,7 +252,17 @@ export async function runAgentLoop(
       const result = await executeTool(page!, call.name, call.arguments, refCache);
 
       if (result.closeAction === "page") {
-        if (page) { await page.close(); page = null; }
+        if (page) {
+          try { await page.close({ runBeforeUnload: false }); } catch (e) { log.warn(`page.close failed — ${e instanceof Error ? e.message : e}`); }
+          page = null;
+        }
+        // For CDP: switch to another existing tab if any, so subsequent tools have a target.
+        if (browser.isCdp() && browser.isLaunched()) {
+          try {
+            const next = await browser.adoptAnotherPage();
+            if (next) page = next;
+          } catch {}
+        }
         prevNodes = []; refCache = new Map(); needFullSnapshot = true;
         log.result(result.text);
         logAI(`TOOL_RESULT ${call.name}`, result.text);
@@ -261,7 +271,7 @@ export async function runAgentLoop(
       }
 
       if (result.closeAction === "browser") {
-        await browser.close();
+        await browser.close(true); // force=true so CDP-attached Chrome actually exits
         page = null;
         prevNodes = []; refCache = new Map(); needFullSnapshot = true;
         store.setStatus({ browserOpen: false, browserMode: null });
