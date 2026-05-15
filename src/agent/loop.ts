@@ -4,6 +4,8 @@ import type { AIClient } from "@/ai/client.ts";
 import type { BrowserManager } from "@/browser/manager.ts";
 import type { SnapshotNode, RefCache } from "@/browser/snapshot.ts";
 import { buildSystemPrompt, buildSnapshotContext } from "@/ai/prompt.ts";
+import { loadExtraRules } from "@/ai/prompt-extra.ts";
+import { pickConditionalRules } from "@/ai/prompt-conditional.ts";
 import { takeSnapshot } from "@/browser/snapshot.ts";
 import { diffSnapshots } from "@/browser/snapshot-diff.ts";
 import { detectCaptcha } from "@/browser/detectors.ts";
@@ -61,9 +63,15 @@ export async function runAgentLoop(
   const supportsVision = process.env.VISION === "true";
   const activeTools = supportsVision ? toolDefinitions : toolDefinitions.filter((t) => t.name !== "screenshot");
   const sysPrompt = buildSystemPrompt(supportsVision, MAX_ITERATIONS, headless);
+  const extraRules = loadExtraRules();
+  const conditional = pickConditionalRules(userPrompt);
   ai.addSystem(sysPrompt);
+  if (extraRules) ai.addSystem(extraRules);
+  if (conditional.rules) ai.addSystem(conditional.rules);
   ai.addUser(userPrompt);
   logAI("SYSTEM", sysPrompt);
+  if (extraRules) logAI("SYSTEM (extra-rules)", extraRules);
+  if (conditional.rules) logAI(`SYSTEM (conditional: ${conditional.labels.join(",")})`, conditional.rules);
   logAI("TASK", userPrompt);
 
   let lastUrl = "";
@@ -138,7 +146,15 @@ export async function runAgentLoop(
         const diff = diffSnapshots(prevNodes, next.nodes, next.url, next.title);
         prevNodes = next.nodes;
         refCache = next.refCache;
-        snapshotContext = diff.compact || "(no changes)";
+        // High-churn fallback: if the diff is mostly additions, the page changed
+        // enough that the diff format costs more than just resending compact.
+        // (Diff lines carry a "[+]" tag per node — wasteful when half the page is new.)
+        const churnRatio = next.nodes.length === 0 ? 0 : diff.added.length / next.nodes.length;
+        if (diff.added.length > 200 || churnRatio > 0.5) {
+          snapshotContext = next.compact;
+        } else {
+          snapshotContext = diff.compact || "(no changes)";
+        }
       }
 
       const interactive = prevNodes.filter((n) => !n.hidden && n.ref);

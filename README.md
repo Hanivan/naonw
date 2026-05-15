@@ -2,286 +2,100 @@
 
 AI-powered browser automation agent. Give it a task in plain English — it controls a real browser to complete it. Also ships `naonw`, a human-facing browser CLI for direct interaction.
 
-## Setup
+> **About the name:** "Naonw" is Sundanese-flavored for *"naon?"* — literally "what?" / "what's this?" Yes, I shipped a tool whose name means "what?" because I couldn't think of a name wkwkwk. If anyone asks what it is, the name does the explaining.
 
 ```bash
 bun install
-cp .env.example .env   # fill in at least one AI provider key
+cp .env.example .env       # add at least one AI provider key
+bun src/index.ts "search the latest iPhone price on tokopedia"
 ```
+
+## Table of Contents
+
+- [Two ways to use it](#two-ways-to-use-it)
+  - [1. AI agent](#1-ai-agent--bun-srcindexts-task)
+  - [2. `naonw` CLI](#2-naonw-cli--direct-browser-control-no-ai)
+- [Features](#features)
+- [Provider priority](#provider-priority)
+- [Project layout](#project-layout)
+- [Development](#development)
 
 ---
 
-## Configuration
+## Two ways to use it
 
-Naonw supports three config layers, loaded lowest → highest priority:
+### 1. AI agent — `bun src/index.ts "<task>"`
 
-| Layer | Path | Format |
-|---|---|---|
-| Global defaults | `~/.config/naonw/config.jsonc` | JSONC |
-| Project override | `.config/naonw.jsonc` | JSONC |
-| Env vars | `.env` / shell env | key=value |
-
-Env vars always win. JSONC files support `//` and `/* */` comments.
-
-### Quick start
+Tell it what to do. It reads the page, calls tools, finishes with a spoken summary.
 
 ```bash
-# Project-level config (copy the example, edit as needed)
-cp .config/naonw.example.jsonc .config/naonw.jsonc
-
-# Global config (shared across all projects)
-mkdir -p ~/.config/naonw
-cp .config/naonw.example.jsonc ~/.config/naonw/config.jsonc
-```
-
-### Config keys
-
-| Key | Env var equivalent | Default |
-|---|---|---|
-| `openrouterApiKey` | `OPENROUTER_API_KEY` | — |
-| `openrouterModel` | `OPENROUTER_MODEL` | — |
-| `ollamaHost` | `OLLAMA_HOST` | `http://localhost:11434` |
-| `ollamaApiKey` | `OLLAMA_API_KEY` | — |
-| `ollamaModel` | `OLLAMA_MODEL` | `minimax-m2.5` |
-| `opencodeApiKey` | `OPENCODE_API_KEY` | — |
-| `opencodeModel` | `OPENCODE_MODEL` | `minimax-m2.5` |
-| `opencodeHost` | `OPENCODE_HOST` | — |
-| `geminiApiKey` | `GEMINI_API_KEY` | — |
-| `headless` | `HEADLESS` | `false` |
-| `cdpUrl` | `NAONW_CDP_URL` | `http://127.0.0.1:9222` |
-| `vision` | `VISION` | `false` |
-| `thinking` | `THINKING` | `false` |
-| `tts` | `TTS` | `true` |
-| `debug` | `DEBUG` | — |
-| `logType` | `LOG_TYPE` | — |
-| `proxy` | `PROXY` | — |
-| `fingerprint` | `FINGERPRINT` | — |
-| `cloakbrowserAutoUpdate` | `CLOAKBROWSER_AUTO_UPDATE` | `false` |
-| `logFile` | `LOG_FILE` | — |
-
-> **Note:** `.config/naonw.jsonc` may contain API keys — add it to `.gitignore` if committing to a shared repo.
-
----
-
-### Environment variables
-
-| Variable | Description | Default |
-|---|---|---|
-| `OPENROUTER_API_KEY` | OpenRouter API key (primary AI provider) | — |
-| `OPENROUTER_MODEL` | Model via OpenRouter | `openrouter/owl-alpha` |
-| `OLLAMA_HOST` | Ollama server URL | `http://localhost:11434` |
-| `OLLAMA_API_KEY` | Ollama Cloud key (omit for local) | — |
-| `OLLAMA_MODEL` | Ollama model | `minimax-m2.5` |
-| `OPENCODE_API_KEY` | OpenCode fallback key | — |
-| `OPENCODE_MODEL` | OpenCode model | `minimax-m2.5` |
-| `GEMINI_API_KEY` | Gemini API key — enables Gemini TTS when set | — |
-| `HEADLESS` | Run browser headless | `false` |
-| `TTS` | Read task result aloud | `true` |
-| `VISION` | Enable screenshot tool | `false` |
-| `THINKING` | Enable thinking/streaming (Ollama only) | `false` |
-| `DEBUG` | Verbose DOM/page-state logs | — |
-| `LOG_TYPE` | `old` for plain text log mode | — |
-| `PROXY` | Proxy URL for browser | — |
-| `FINGERPRINT` | CloakBrowser fingerprint seed | — |
-| `CLOAKBROWSER_AUTO_UPDATE` | Auto-update stealth browser binary | `false` |
-
-Provider priority: **OpenRouter → Ollama → OpenCode**. Providers without keys are skipped.
-
----
-
-## AI Agent
-
-```bash
-bun src/index.ts "<task>"
-```
-
-Always quote the task — shell treats `&`, `(`, `)`, `|`, `*` as special characters.
-
-```bash
-bun src/index.ts "search for the latest iPhone price on tokopedia"
-bun src/index.ts "fill the contact form on hanivan.my.id"
 bun src/index.ts "list FedEx shipping rates from JP to Botani Square Bogor"
+bun src/index.ts "play sakura miko's latest stream"
 bun src/index.ts "what is the prayer schedule in Bogor today"
 ```
 
-### How it works
+→ See [docs/features/ai-agent.md](docs/features/ai-agent.md) for the full tool list, vision/thinking modes, and resilience model.
 
-1. Launches a stealth Chromium browser (CloakBrowser, visible by default)
-2. Sends your task to the AI provider
-3. AI calls tools in a loop (max 20 steps) until the task is done
-4. Result is printed and optionally read aloud via TTS
+### 2. `naonw` CLI — direct browser control, no AI
 
-### AI tools
+Tag-prefixed greppable output. `[GO]`, `[OK]`, `[SHOT]`, `[SNAP]`, `[TEXT]`, `[JS]`, `[TAB ...]`.
 
-| Tool | Description |
-|---|---|
-| `navigate(url)` | Go to a URL |
-| `back()` / `forward()` | Browser history |
-| `click(ref)` | Click element by accessibility ref |
-| `type(ref, text, clear?)` | Type into an input |
-| `typeAndSelect(ref, text, pick?)` | Type into a combobox + pick suggestion |
-| `select(ref, value)` | Pick a `<select>` option |
-| `fill({label: value})` | Fill multiple form fields at once |
-| `scroll(direction?, px?)` | Scroll the page |
-| `key(keys)` | Press keys — combos: `Ctrl+a`, `Meta+Shift+T` |
-| `hover(x, y)` | Mouse hover at coordinates |
-| `drag(x1, y1, x2, y2)` | Drag between coordinates |
-| `evaluate(code)` | Eval JS in page, returns result |
-| `wait(ms)` | Pause |
-| `screenshot()` | Capture page and send to AI (requires `VISION=true`) |
-| `solveCaptcha()` | Capture and describe a reCAPTCHA challenge |
-| `clickCaptchaTile(ids, verify?)` | Click reCAPTCHA tiles by index |
-| `closePage()` | Close current tab |
-| `closeBrowser()` | Close the browser |
-| `done(summary, lang)` | Finish with a summary (`lang`: `"en"` or `"id"`) |
+```bash
+naonw go example.com           # → [GO] https://example.com/ — Example Domain
+naonw fill "Email=a@b.com"     # → [OK] fill Email
+naonw shot                     # → [SHOT] ./shot.png 1024×768
+naonw snap                     # → [SNAP] N elements   <list>
+```
+
+Requires Chrome on `--remote-debugging-port=9222`. Install: `bun run install:naonw`.
+
+→ See [docs/features/cli.md](docs/features/cli.md) for all commands, flags, examples, and install instructions.
 
 ---
 
-## `naonw` — Browser CLI
+## Features
 
-`naonw` lets you control a browser directly from the terminal — no AI involved. Useful for scripting, debugging, or quick interactions.
+| Topic | Highlights | Doc |
+|---|---|---|
+| **Configuration** | 3 layers (global JSONC / project JSONC / env), pre-flight provider validation, OpenRouter → Ollama → OpenCode fallback | [configuration.md](docs/features/configuration.md) |
+| **AI agent** | 22 tools, scroll-into-view + synthetic-click fallback, mid-conversation provider switching, crash-resilient loop | [ai-agent.md](docs/features/ai-agent.md) |
+| **`naonw` CLI** | Direct browser control without AI, tag-prefixed output, JSON mode for piping | [cli.md](docs/features/cli.md) |
+| **Token optimization** | 3-layer system prompt (always / extra-rules / 15 conditional labels), snapshot trimming (~60-70% smaller), per-page hints | [token-optimization.md](docs/features/token-optimization.md) |
+| **Logging** | Two log files: human-readable `run.log` + LLM payload `ai-context.log` for debugging model decisions | [logging.md](docs/features/logging.md) |
+| **Browser** | CDP attach or stealth Chromium launch, headless mode, captcha auto-relaunch as visible, snapshot retries on nav errors | [browser.md](docs/features/browser.md) |
+| **Queue & captcha** | FIFO follow-up queue while agent runs, captcha-mode preempts the queue, `d` to remove queued items | [queue-and-captcha.md](docs/features/queue-and-captcha.md) |
+| **TTS** | Gemini TTS or local fallback (SAPI / say / espeak-ng), language-aware voice selection, errors logged not swallowed | [tts.md](docs/features/tts.md) |
 
-### Requirements
+---
 
-Chrome must be running with remote debugging enabled on port 9222:
+## Provider priority
 
-```bash
-google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
+**OpenRouter → Ollama → OpenCode**. Providers without keys are skipped. Fallback fires on rate limit, model unavailable, auth failure, server error, or network error — and the new provider inherits a syntactically valid history so it can take over mid-conversation.
+
+---
+
+## Project layout
+
+```
+src/
+  agent/          loop, tools (interaction, navigation, observe, capture, captcha)
+  ai/             prompt.ts, prompt-extra.ts, prompt-conditional.ts, context-hints.ts, providers/
+  browser/        manager, snapshot, snapshot-diff, actions, detectors
+  cli/            naonw entry, commands/
+  ui/             Ink TUI (header, log-panel, task-sidebar, input-bar, store)
+  utils/          logger, tts, gemini-tts, prompt
+  config/         JSONC + env merging
+docs/features/    detailed per-feature docs
 ```
 
-Override the default CDP URL with `NAONW_CDP_URL`:
+---
+
+## Development
 
 ```bash
-NAONW_CDP_URL=http://localhost:9999 bun run naonw snap
+bun src/index.ts "task"        # run agent
+bun run naonw <cmd>            # run CLI
+bun tsc --noEmit               # typecheck
 ```
 
-### Install
-
-Build a standalone binary and add it to your PATH:
-
-```bash
-bun run build:naonw          # compiles → dist/naonw
-bun run install:naonw        # build + copies to ~/.local/bin/naonw
-```
-
-Make sure `~/.local/bin` is in `$PATH`:
-
-```bash
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
-
-Or run without installing:
-
-```bash
-bun run naonw <command> [args]
-```
-
-### Commands
-
-#### Navigation
-
-```bash
-naonw go https://example.com        # navigate (waits for networkidle)
-naonw url                            # print current URL
-naonw back                           # go back
-naonw forward                        # go forward
-```
-
-#### Observe
-
-```bash
-naonw text                           # visible text of <body>
-naonw text "h1"                      # visible text of a CSS selector
-naonw shot                           # screenshot → ./shot.png
-naonw shot /tmp/page.png             # screenshot to custom path
-naonw shot --width 1440 --height 900 # screenshot at custom viewport size
-naonw snap                           # interactive elements via Accessibility Tree
-naonw snap --json                    # snap output as JSON
-```
-
-#### Interact
-
-```bash
-naonw click 400 300                  # click at coordinates
-naonw click 400 300 --right          # right-click
-naonw click 400 300 --double         # double-click
-naonw type "hello world"             # type text at current focus
-naonw type 400 300 "hello"           # triple-click at coords, then type
-naonw fill "Email=me@example.com" "Name=Jo"   # fill form fields by label/placeholder/name
-naonw key Enter                      # press a key
-naonw key Escape
-naonw key "Ctrl+a" "Ctrl+c"          # key combos, space-separated
-naonw move 400 300                   # hover at coordinates
-naonw drag 100 200 400 200           # drag from (100,200) to (400,200)
-naonw scroll                         # scroll down 500px
-naonw scroll up
-naonw scroll down 1000
-naonw scroll left 300
-```
-
-#### Tabs
-
-```bash
-naonw tab list                       # list open tabs (id, url, title)
-naonw tab list --json
-naonw tab new                        # open a new blank tab, prints id
-naonw tab new https://example.com    # open a new tab at URL
-naonw tab close                      # close last opened tab
-naonw tab close <id>                 # close tab by id
-```
-
-#### Other
-
-```bash
-naonw js "document.title"            # eval JS, prints result
-naonw js "window.scrollY"
-naonw wait 2000                      # wait 2 seconds
-naonw wait "#submit-btn"             # wait for selector to appear
-naonw wait networkidle               # wait for network to settle
-naonw wait "url:dashboard"           # wait until URL contains "dashboard"
-```
-
-### Flags
-
-| Flag | Description |
-|---|---|
-| `--timeout <ms>` | Timeout in ms (default: 30000) |
-| `--tab <id>` | Target a specific tab by Chrome id |
-| `--json` | Structured JSON output (`snap`, `tab list`) |
-| `--right` | Right-click (with `click`) |
-| `--double` | Double-click (with `click`) |
-| `--width <px>` | Screenshot viewport width |
-| `--height <px>` | Screenshot viewport height |
-
-### Examples
-
-```bash
-# Open a page and grab its title
-naonw go https://news.ycombinator.com
-naonw js "document.title"
-
-# Fill and submit a login form
-naonw fill "Email=user@example.com" "Password=hunter2"
-naonw key Enter
-
-# Scroll to bottom, screenshot
-naonw scroll down 9999
-naonw shot bottom.png
-
-# List all open tabs and target one
-naonw tab list
-naonw snap --tab <id>
-
-# Search on Google — page auto-focuses the input, so type works directly
-naonw go https://www.google.com
-naonw type "bun"
-naonw key Enter
-
-# If the input is NOT auto-focused, use snap to find its coordinates first
-naonw go https://www.google.com
-naonw snap
-# [4] searchbox "Search" (512, 300)   ← read x,y from output
-naonw type 512 300 "bun"                 # triple-clicks at (512,300) to focus, then types
-naonw key Enter
-```
+Logs land in `logs/run.log` and `logs/ai-context.log` (truncated each session). For tuning prompt behavior or debugging model decisions, `tail -f logs/ai-context.log` is the fastest path.

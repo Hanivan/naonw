@@ -24,7 +24,18 @@ export interface SnapshotResult {
 
 export type RefCache = Map<string, number>;
 
-export const SKIP_ROLES = new Set(["none", "generic", "InlineTextBox"]);
+export const SKIP_ROLES = new Set([
+  "none", "generic", "InlineTextBox",
+  // Structural wrappers; their children carry the info.
+  "tablist", "tabpanel", "tooltip", "presentation", "LineBreak", "paragraph",
+]);
+
+// Landmark / container roles to skip ONLY when they have no accessible name.
+// (Named ones — e.g. <nav aria-label="Main"> — still carry useful semantics.)
+export const SKIP_IF_UNNAMED = new Set([
+  "list", "listitem", "navigation", "search", "banner",
+  "complementary", "contentinfo", "region", "group", "form",
+]);
 export const INTERACTIVE_ROLES = new Set([
   "button", "link", "textbox", "combobox", "listbox", "option",
   "checkbox", "radio", "menuitem", "tab", "searchbox", "spinbutton",
@@ -93,20 +104,43 @@ async function snapshotOnce(page: Page): Promise<SnapshotResult> {
     const refCache: RefCache = new Map();
     let refId = 0;
 
-    function walk(ax: RawAXNode, depth: number): void {
+    function walk(ax: RawAXNode, depth: number, parentLabels: string[] = []): void {
       if (ax.ignored) {
         for (const id of ax.childIds ?? []) {
           const child = nodeMap.get(id);
-          if (child) walk(child, depth);
+          if (child) walk(child, depth, parentLabels);
         }
         return;
       }
 
       const role = ax.role?.value ?? "";
+      const axName = ax.name?.value ?? "";
+
+      // Drop StaticText whose text duplicates an ancestor's name OR value,
+      // or that is a pure separator/punctuation noise (e.g. " - ", " • ", "|").
+      if (role === "StaticText" && axName) {
+        const t = axName.trim();
+        if (parentLabels.some((l) => l === t)) return;
+        // ≤3 chars and contains no letter/digit → separator noise
+        if (t.length <= 3 && !/[\p{L}\p{N}]/u.test(t)) return;
+      }
+
+      // Decorative images (no alt text) carry no info for the agent.
+      if (role === "image" && !axName) return;
+
+      // Skip landmark wrappers when they have no name — their children carry the info.
+      if (SKIP_IF_UNNAMED.has(role) && !axName) {
+        for (const id of ax.childIds ?? []) {
+          const child = nodeMap.get(id);
+          if (child) walk(child, depth, parentLabels);
+        }
+        return;
+      }
+
       if (SKIP_ROLES.has(role)) {
         for (const id of ax.childIds ?? []) {
           const child = nodeMap.get(id);
-          if (child) walk(child, depth);
+          if (child) walk(child, depth, parentLabels);
         }
         return;
       }
@@ -133,9 +167,13 @@ async function snapshotOnce(page: Page): Promise<SnapshotResult> {
       if (backendNodeId > 0) refCache.set(ref, backendNodeId);
       nodes.push(node);
 
+      const childLabels: string[] = [];
+      if (axName) childLabels.push(axName.trim());
+      if (rawValue !== undefined) childLabels.push(String(rawValue).trim());
+      const nextLabels = childLabels.length ? childLabels : parentLabels;
       for (const id of ax.childIds ?? []) {
         const child = nodeMap.get(id);
-        if (child) walk(child, depth + 1);
+        if (child) walk(child, depth + 1, nextLabels);
       }
     }
 
