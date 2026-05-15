@@ -1,10 +1,10 @@
 // src/index.ts
-import { loadConfig } from "@/utils/config.ts";
+import { loadConfig } from "@/config/index.ts";
 loadConfig();
 import { render } from "ink";
 import { createElement } from "react";
 import { BrowserManager } from "@/browser/manager.ts";
-import { FallbackClient } from "@/ai/fallback-client.ts";
+import { FallbackClient } from "@/ai/fallback.ts";
 import { runAgentLoop } from "@/agent/loop.ts";
 import { store } from "@/ui/store.ts";
 import { App } from "@/ui/app.tsx";

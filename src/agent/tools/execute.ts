@@ -29,6 +29,9 @@ const handlers: Record<string, Handler> = {
   solveCaptcha: (p) => solveCaptcha(p),
   clickCaptchaTile: (p, a) => clickCaptchaTile(p, a),
   done: (p, a) => done(p, a),
+  // Signal-only: loop handles actual close using result.closeAction
+  closePage:    async () => ({ text: "Page closed",    closeAction: "page"    as const }),
+  closeBrowser: async () => ({ text: "Browser closed", closeAction: "browser" as const }),
 };
 
 export async function executeTool(

@@ -1,5 +1,5 @@
 import type { ChatResult, ToolDefinition } from "@/ai/client.ts";
-import { OAIProvider, type OAIMessage, type OAIToolCall } from "@/ai/provider.ts";
+import { OAIProvider, type OAIMessage, type OAIToolCall } from "@/ai/providers/base.ts";
 import { log } from "@/utils/logger.ts";
 
 export interface OpenRouterClientConfig {

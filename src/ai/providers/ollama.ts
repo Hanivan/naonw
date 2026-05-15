@@ -1,5 +1,5 @@
 import type { ChatResult, ToolCallResult, ToolDefinition } from "@/ai/client.ts";
-import { DirectProvider } from "@/ai/provider.ts";
+import { DirectProvider } from "@/ai/providers/base.ts";
 import { Ollama, type Message, type Tool } from "ollama";
 import { log } from "@/utils/logger.ts";
 
@@ -73,6 +73,13 @@ export class OllamaClient extends DirectProvider {
     this.messages = [];
   }
 
+  private trimHistory(): OllamaMessage[] {
+    if (this.messages.length <= 13) return this.messages;
+    const result = [this.messages[0]!, ...this.messages.slice(-12)];
+    while (result.length > 1 && result[1]?.role === "tool") result.splice(1, 1);
+    return result;
+  }
+
   async chat(tools: ToolDefinition[]): Promise<ChatResult> {
     if (this.apiKeys.length) {
       const entry = this.nextKey();
@@ -94,8 +101,10 @@ export class OllamaClient extends DirectProvider {
       }));
     }
 
+    const history = this.trimHistory();
+
     if (process.env.DEBUG) {
-      const dump = this.messages
+      const dump = history
         .map((m, i) => {
           const role = m.tool_name ? `${m.role}(${m.tool_name})` : m.role;
           const img = m.images?.length ? ` [+${m.images.length} img]` : "";
@@ -104,7 +113,7 @@ export class OllamaClient extends DirectProvider {
         })
         .join("\n");
       const toolNames = this.cachedTools?.map((t) => t.function.name).join(", ") ?? "none";
-      log.debug(`→ ${this.model} (${this.messages.length} msgs)\n${dump}\n  tools: [${toolNames}]`);
+      log.debug(`→ ${this.model} (${history.length} msgs)\n${dump}\n  tools: [${toolNames}]`);
     }
 
     if (!this.thinking) {
@@ -112,7 +121,7 @@ export class OllamaClient extends DirectProvider {
       try {
         response = await this.ollama.chat({
           model: this.model,
-          messages: this.messages,
+          messages: history,
           tools: this.cachedTools!,
           think: this.thinking,
         });
@@ -126,7 +135,7 @@ export class OllamaClient extends DirectProvider {
               this.ollama = new Ollama({ host: this.host, headers: { Authorization: `Bearer ${entry.key}` } });
               response = await this.ollama.chat({
                 model: this.model,
-                messages: this.messages,
+                messages: history,
                 tools: this.cachedTools!,
                 think: this.thinking,
               });
@@ -159,7 +168,7 @@ export class OllamaClient extends DirectProvider {
 
     const stream = await this.ollama.chat({
       model: this.model,
-      messages: this.messages,
+      messages: history,
       tools: this.cachedTools!,
       think: this.thinking,
       stream: true,

@@ -193,30 +193,28 @@ export async function runAgentLoop(
 
       if (call.name !== "done") log.tool(call.name, call.arguments, response.provider);
 
-      if (call.name === "closePage") {
-        store.setStatus({ agentStatus: "tool" });
-        if (page) { await page.close(); page = null; }
-        prevNodes = []; refCache = new Map(); needFullSnapshot = true;
-        log.result("Page closed");
-        ai.addToolResult(call.name, "Page closed");
-        continue;
-      }
-
-      if (call.name === "closeBrowser") {
-        store.setStatus({ agentStatus: "tool" });
-        await browser.close();
-        page = null;
-        prevNodes = []; refCache = new Map(); needFullSnapshot = true;
-        store.setStatus({ browserOpen: false });
-        log.result("Browser closed");
-        ai.addToolResult(call.name, "Browser closed");
-        continue;
-      }
-
       if (BROWSER_TOOLS.has(call.name)) page = await ensurePage();
       store.setStatus({ agentStatus: "tool" });
 
       const result = await executeTool(page!, call.name, call.arguments, refCache);
+
+      if (result.closeAction === "page") {
+        if (page) { await page.close(); page = null; }
+        prevNodes = []; refCache = new Map(); needFullSnapshot = true;
+        log.result(result.text);
+        ai.addToolResult(call.name, result.text);
+        continue;
+      }
+
+      if (result.closeAction === "browser") {
+        await browser.close();
+        page = null;
+        prevNodes = []; refCache = new Map(); needFullSnapshot = true;
+        store.setStatus({ browserOpen: false });
+        log.result(result.text);
+        ai.addToolResult(call.name, result.text);
+        continue;
+      }
 
       if (result.isStaleRef) {
         needFullSnapshot = true;

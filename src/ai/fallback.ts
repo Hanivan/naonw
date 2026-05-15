@@ -1,10 +1,10 @@
 import type { ChatResult, ToolDefinition } from "@/ai/client.ts";
-import { BaseProvider } from "@/ai/provider.ts";
+import { BaseProvider } from "@/ai/providers/base.ts";
 import { toMessage } from "@/utils/errors.ts";
 import { log } from "@/utils/logger.ts";
-import { OllamaClient } from "./ollama-client.ts";
-import { OpencodeClient } from "./opencode-client.ts";
-import { OpenRouterClient } from "./openrouter-client.ts";
+import { OllamaClient } from "@/ai/providers/ollama.ts";
+import { OpencodeClient } from "@/ai/providers/opencode.ts";
+import { OpenRouterClient } from "@/ai/providers/openrouter.ts";
 
 export interface FallbackClientConfig {
   ollama: { apiKeys?: string[]; host?: string; model?: string; supportsVision?: boolean; thinking?: boolean };

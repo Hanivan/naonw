@@ -2,6 +2,7 @@
 import type { Page } from "puppeteer-core";
 import type { ToolResult } from "./types.ts";
 import type { RefCache } from "@/browser/snapshot.ts";
+import { fillFields, scrollPage, pressKeys, moveMouse, dragMouse, evaluateJs } from "@/browser/actions.ts";
 import { log } from "@/utils/logger.ts";
 
 export class UnknownRefError extends Error {
@@ -100,95 +101,34 @@ export async function selectOption(page: Page, args: Record<string, unknown>, re
 export async function scroll(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
   const dir = (args.direction as string | undefined) ?? "down";
   const px = (args.px as number | undefined) ?? 500;
-  const deltas: Record<string, { x: number; y: number }> = {
-    up: { x: 0, y: -1 }, down: { x: 0, y: 1 },
-    left: { x: -1, y: 0 }, right: { x: 1, y: 0 },
-  };
-  const delta = deltas[dir];
-  if (!delta) throw new Error(`Invalid direction "${dir}". Use: up, down, left, right`);
-  await page.mouse.wheel({ deltaX: delta.x * px, deltaY: delta.y * px });
+  await scrollPage(page, dir, px);
   return { text: `Scrolled ${dir} ${px}px` };
 }
 
 export async function pressKey(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
-  const keys = args.keys as string;
-  for (const k of keys.split(" ").filter(Boolean)) {
-    if (!k.includes("+")) {
-      await page.keyboard.press(k as any);
-      continue;
-    }
-    const parts = k.split("+");
-    const modifiers = parts.slice(0, -1);
-    const finalKey = parts.at(-1)!;
-    for (const m of modifiers) await page.keyboard.down(m as any);
-    await page.keyboard.press(finalKey as any);
-    for (const m of [...modifiers].reverse()) await page.keyboard.up(m as any);
-  }
-  return { text: `Pressed key(s): ${keys}` };
+  await pressKeys(page, args.keys as string);
+  return { text: `Pressed key(s): ${args.keys as string}` };
 }
 
 export async function hover(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
-  const x = args.x as number;
-  const y = args.y as number;
-  await page.mouse.move(x, y);
-  return { text: `Hovered at (${x}, ${y})` };
+  await moveMouse(page, args.x as number, args.y as number);
+  return { text: `Hovered at (${args.x}, ${args.y})` };
 }
 
 export async function drag(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
-  const x1 = args.x1 as number, y1 = args.y1 as number;
-  const x2 = args.x2 as number, y2 = args.y2 as number;
-  await page.mouse.move(x1, y1);
-  await page.mouse.down();
-  await page.mouse.move(x2, y2, { steps: 10 });
-  await page.mouse.up();
-  return { text: `Dragged (${x1},${y1}) → (${x2},${y2})` };
+  await dragMouse(page, args.x1 as number, args.y1 as number, args.x2 as number, args.y2 as number);
+  return { text: `Dragged (${args.x1},${args.y1}) → (${args.x2},${args.y2})` };
 }
 
 export async function evaluate(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
-  const code = args.code as string;
-  const result = await page.evaluate(code);
+  const result = await evaluateJs(page, args.code as string);
   const out = result === undefined || result === null ? "" : (typeof result === "string" ? result : JSON.stringify(result));
   return { text: out || "null" };
 }
 
 export async function fill(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
   const fields = args.fields as Record<string, string>;
-  const results: { filled: string[]; failed: string[] } = await page.evaluate((fields) => {
-    const filled: string[] = [];
-    const failed: string[] = [];
-    const esc = (v: string) => typeof CSS !== "undefined" ? CSS.escape(v) : v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    const find = (key: string): HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null => {
-      if (key.startsWith("#") || key.startsWith(".") || key.startsWith("[")) {
-        try { return document.querySelector(key); } catch { return null; }
-      }
-      const e = esc(key);
-      return (
-        document.querySelector<HTMLInputElement>(`[aria-label="${e}"]`) ??
-        document.querySelector<HTMLInputElement>(`[placeholder="${e}"]`) ??
-        document.querySelector<HTMLInputElement>(`[name="${e}"]`) ??
-        document.getElementById(key) as HTMLInputElement | null ??
-        (() => {
-          for (const label of Array.from(document.querySelectorAll("label"))) {
-            if (label.textContent?.trim().toLowerCase().includes(key.toLowerCase())) {
-              const id = label.getAttribute("for");
-              if (id) return document.getElementById(id) as HTMLInputElement | null;
-              return label.querySelector("input,textarea,select") as HTMLInputElement | null;
-            }
-          }
-          return null;
-        })()
-      );
-    };
-    for (const [key, value] of Object.entries(fields)) {
-      const el = find(key);
-      if (!el) { failed.push(key); continue; }
-      (el as HTMLInputElement).value = value;
-      el.dispatchEvent(new Event("input", { bubbles: true }));
-      el.dispatchEvent(new Event("change", { bubbles: true }));
-      filled.push(key);
-    }
-    return { filled, failed };
-  }, fields);
+  const results = await fillFields(page, fields);
   if (results.failed.length) throw new Error(`Fields not found: ${results.failed.join(", ")}`);
   return { text: `Filled: ${results.filled.join(", ")}` };
 }
