@@ -1,7 +1,7 @@
 import { Box, useWindowSize } from "ink";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { store } from "@/ui/store.ts";
-import type { LogEntry, Status, ProviderData } from "@/ui/store.ts";
+import type { LogEntry, Status, ProviderData, QueuedMessage } from "@/ui/store.ts";
 import { LogPanel } from "@/ui/log-panel.tsx";
 import type { LogPanelRef } from "@/ui/log-panel.tsx";
 import { InputBar } from "@/ui/input-bar.tsx";
@@ -23,19 +23,23 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
   const [logs, setLogs] = useState<LogEntry[]>([...store.logs]);
   const [status, setStatus] = useState<Status>({ ...store.status });
   const [providers, setProviders] = useState<ProviderData[]>([...store.providers]);
+  const [queued, setQueued] = useState<QueuedMessage[]>([...store.queue]);
   const logPanelRef = useRef<LogPanelRef>(null);
 
   useEffect(() => {
     const onLog = () => { setLogs([...store.logs]); };
     const onStatus = () => setStatus({ ...store.status });
     const onProviders = () => setProviders([...store.providers]);
+    const onQueue = () => setQueued([...store.queue]);
     store.on("log", onLog);
     store.on("status", onStatus);
     store.on("providers", onProviders);
+    store.on("queue", onQueue);
     return () => {
       store.off("log", onLog);
       store.off("status", onStatus);
       store.off("providers", onProviders);
+      store.off("queue", onQueue);
     };
   }, []);
 
@@ -48,7 +52,7 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
   return (
     <Box flexDirection="column" width="100%" height={rows} overflow="hidden">
       <HeaderBar status={status} providers={providers} />
-      <LogPanel ref={logPanelRef} logs={logs} paneHeight={mainHeight} />
+      <LogPanel ref={logPanelRef} logs={logs} paneHeight={mainHeight} queued={queued} />
       <InputBar onSubmit={onSubmit} onInterrupt={onInterrupt} onKey={handleKey} />
     </Box>
   );
