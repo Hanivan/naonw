@@ -76,21 +76,17 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
       setSelectedIndex(lastIndex);
       atBottomRef.current = true;
       setScrollOffset(0);
-      prevLastIndexRef.current = lastIndex;
-      prevLiveIndexRef.current = liveIndex;
-      return;
-    }
-    if (lastIndex !== null && lastIndex !== prevLastIndexRef.current) {
-      // A new task was added.
+    } else if (lastIndex !== null && lastIndex !== prevLastIndexRef.current) {
+      // A new task was added. Follow if user was on the previously-LIVE task.
       if (selectedIndex === prevLiveIndexRef.current) {
-        // User was on the previously-LIVE task: follow.
         setSelectedIndex(lastIndex);
         atBottomRef.current = true;
         setScrollOffset(0);
       }
-      prevLastIndexRef.current = lastIndex;
-      prevLiveIndexRef.current = liveIndex;
     }
+    prevLastIndexRef.current = lastIndex;
+    // Only remember non-null liveIndex so prevLive points at the LAST task to ever be LIVE.
+    if (liveIndex !== null) prevLiveIndexRef.current = liveIndex;
   }, [lastIndex, liveIndex, selectedIndex]);
 
   const selectedTask = useMemo(
