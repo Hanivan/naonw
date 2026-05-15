@@ -2,6 +2,7 @@ import { appendFileSync, writeFileSync } from "node:fs";
 import { store, type ProviderData } from "@/ui/store.ts";
 
 let activeGroupId: string | null = null;
+let groupCounter = 0;
 
 const LOG_FILE = process.env.LOG_FILE ?? "logs/run.log";
 
@@ -62,9 +63,9 @@ export const log = {
     writeFile("CAPTCHA", msg);
   },
   agent(msg: string): void {
-    if (activeGroupId) store.endGroup(activeGroupId);
-    activeGroupId = store.startGroup();
-    store.pushLog({ level: "AGENT", msg, timestamp: ts() });
+    groupCounter += 1;
+    activeGroupId = `g${groupCounter}`;
+    store.pushLog({ level: "AGENT", msg, timestamp: ts(), groupId: activeGroupId });
     writeFile("AGENT", msg);
   },
   think(msg: string): void {
@@ -90,12 +91,12 @@ export const log = {
     });
   },
   success(msg: string): void {
-    if (activeGroupId) { store.endGroup(activeGroupId); activeGroupId = null; }
+    activeGroupId = null;
     store.pushLog({ level: "DONE", msg, timestamp: ts() });
     writeFile("DONE", msg);
   },
   fail(msg: string): void {
-    if (activeGroupId) { store.endGroup(activeGroupId); activeGroupId = null; }
+    activeGroupId = null;
     store.pushLog({ level: "FAIL", msg, timestamp: ts() });
     writeFile("FAIL", msg);
   },
