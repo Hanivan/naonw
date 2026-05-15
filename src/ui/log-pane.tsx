@@ -116,7 +116,7 @@ export function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>)
 }
 
 // ── Entry renderer ────────────────────────────────────────────────────────────
-function renderEntry(entry: LogEntry, key: number) {
+export function renderEntry(entry: LogEntry, key: number) {
   if (!IS_FANCY) {
     return (
       <Box key={key} flexDirection="row">
