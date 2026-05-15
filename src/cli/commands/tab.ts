@@ -16,7 +16,8 @@ export async function cmdTab(args: string[], flags: Flags) {
     }));
     await browser.disconnect();
     if (flags.json) { console.log(JSON.stringify(entries, null, 2)); return; }
-    for (const { id, url, title } of entries) console.log(`${id}\t${url}\t${title}`);
+    console.log(`[TAB LIST] ${entries.length} tab${entries.length !== 1 ? "s" : ""}`);
+    for (const { id, url, title } of entries) console.log(`  ${id}\t${url}\t${title}`);
     return;
   }
 
@@ -29,8 +30,11 @@ export async function cmdTab(args: string[], flags: Flags) {
     const page = await target.page();
     if (!page) { await browser.disconnect(); throw new Error("Failed to attach to new tab"); }
     if (url) await page.goto(url, { waitUntil: "networkidle0", timeout: flags.timeout });
+    const finalUrl = page.url();
+    let title = "";
+    try { title = (await page.title()).trim(); } catch {}
     await browser.disconnect();
-    console.log(id);
+    console.log(`[TAB NEW] ${id} ${finalUrl}${title ? ` — ${title}` : ""}`);
     return;
   }
 
@@ -39,9 +43,11 @@ export async function cmdTab(args: string[], flags: Flags) {
     const id = rest[0];
     const target = id ? pages.find(t => targetId(t) === id) : pages[pages.length - 1];
     if (!target) { await browser.disconnect(); throw new Error(`No tab: ${id}`); }
+    const closedId = targetId(target);
+    const closedUrl = target.url();
     const page = await target.page();
     await page!.close();
-    console.log(`Closed ${targetId(target)}\t${target.url()}`);
     await browser.disconnect();
+    console.log(`[TAB CLOSE] ${closedId} ${closedUrl}`);
   }
 }
