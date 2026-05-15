@@ -1,4 +1,6 @@
 // src/index.ts
+import { loadConfig } from "@/utils/config.ts";
+loadConfig();
 import { render } from "ink";
 import { createElement } from "react";
 import { BrowserManager } from "@/browser/manager.ts";

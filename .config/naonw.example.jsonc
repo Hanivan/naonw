@@ -1,0 +1,34 @@
+{
+  // OpenRouter — primary AI provider
+  // "openrouterApiKey": "sk-or-...",
+  // "openrouterModel": "openrouter/owl-alpha",
+  // "openrouterSiteUrl": "",
+  // "openrouterSiteName": "",
+
+  // Ollama — local or cloud
+  // "ollamaHost": "http://localhost:11434",
+  // "ollamaApiKey": "",
+  // "ollamaModel": "minimax-m2.5",
+
+  // OpenCode — last fallback
+  // "opencodeApiKey": "",
+  // "opencodeModel": "minimax-m2.5",
+  // "opencodeHost": "https://opencode.ai/zen/go/v1",
+
+  // Gemini — enables TTS when set
+  // "geminiApiKey": "AIza...",
+
+  // Browser
+  "headless": false,
+  "cdpUrl": "http://127.0.0.1:9222",
+
+  // Features
+  "vision": false,
+  "thinking": false,
+  "tts": true,
+  "debug": false,
+  // "logType": "old",
+  // "proxy": "http://user:pass@host:port",
+  // "fingerprint": "",
+  "cloakbrowserAutoUpdate": false
+}

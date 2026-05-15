@@ -9,6 +9,60 @@ bun install
 cp .env.example .env   # fill in at least one AI provider key
 ```
 
+---
+
+## Configuration
+
+Naonw supports three config layers, loaded lowest → highest priority:
+
+| Layer | Path | Format |
+|---|---|---|
+| Global defaults | `~/.config/naonw/config.jsonc` | JSONC |
+| Project override | `.config/naonw.jsonc` | JSONC |
+| Env vars | `.env` / shell env | key=value |
+
+Env vars always win. JSONC files support `//` and `/* */` comments.
+
+### Quick start
+
+```bash
+# Project-level config (copy the example, edit as needed)
+cp .config/naonw.example.jsonc .config/naonw.jsonc
+
+# Global config (shared across all projects)
+mkdir -p ~/.config/naonw
+cp .config/naonw.example.jsonc ~/.config/naonw/config.jsonc
+```
+
+### Config keys
+
+| Key | Env var equivalent | Default |
+|---|---|---|
+| `openrouterApiKey` | `OPENROUTER_API_KEY` | — |
+| `openrouterModel` | `OPENROUTER_MODEL` | — |
+| `ollamaHost` | `OLLAMA_HOST` | `http://localhost:11434` |
+| `ollamaApiKey` | `OLLAMA_API_KEY` | — |
+| `ollamaModel` | `OLLAMA_MODEL` | `minimax-m2.5` |
+| `opencodeApiKey` | `OPENCODE_API_KEY` | — |
+| `opencodeModel` | `OPENCODE_MODEL` | `minimax-m2.5` |
+| `opencodeHost` | `OPENCODE_HOST` | — |
+| `geminiApiKey` | `GEMINI_API_KEY` | — |
+| `headless` | `HEADLESS` | `false` |
+| `cdpUrl` | `NAONW_CDP_URL` | `http://127.0.0.1:9222` |
+| `vision` | `VISION` | `false` |
+| `thinking` | `THINKING` | `false` |
+| `tts` | `TTS` | `true` |
+| `debug` | `DEBUG` | — |
+| `logType` | `LOG_TYPE` | — |
+| `proxy` | `PROXY` | — |
+| `fingerprint` | `FINGERPRINT` | — |
+| `cloakbrowserAutoUpdate` | `CLOAKBROWSER_AUTO_UPDATE` | `false` |
+| `logFile` | `LOG_FILE` | — |
+
+> **Note:** `.config/naonw.jsonc` may contain API keys — add it to `.gitignore` if committing to a shared repo.
+
+---
+
 ### Environment variables
 
 | Variable | Description | Default |

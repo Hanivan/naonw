@@ -1,5 +1,7 @@
 // naonw — Naonw browser CLI
 // Usage: bun src/naonw.ts <command> [args] [flags]
+import { loadConfig } from "./utils/config.ts";
+loadConfig();
 import puppeteer from "puppeteer-core";
 import type { Page, KeyInput } from "puppeteer-core";
 import { parseArgs } from "node:util";
