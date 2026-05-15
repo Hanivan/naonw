@@ -79,6 +79,14 @@ class Store extends EventEmitter {
   status: Status = { ...DEFAULT_STATUS };
   providers: ProviderData[] = [];
   queue: QueuedMessage[] = [];
+  captchaPending = false;
+
+  setCaptchaPending(value: boolean): void {
+    if (this.captchaPending === value) return;
+    this.captchaPending = value;
+    this.emit("captcha");
+  }
+
   private _queueCounter = 0;
 
   enqueue(prompt: string): QueuedMessage {
