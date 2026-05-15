@@ -80,4 +80,16 @@ export class FallbackClient extends BaseProvider {
   override async close(): Promise<void> {
     for (const c of this.providers) await c.close();
   }
+
+  // Returns null if at least one provider passes; otherwise a multi-line error.
+  override async validate(): Promise<string | null> {
+    if (this.providers.length === 0) return "no AI providers configured";
+    const errors: string[] = [];
+    for (const p of this.providers) {
+      const err = await p.validate();
+      if (err === null) return null;
+      errors.push(`  • ${p.provider}: ${err}`);
+    }
+    return `all providers failed pre-flight checks:\n${errors.join("\n")}`;
+  }
 }

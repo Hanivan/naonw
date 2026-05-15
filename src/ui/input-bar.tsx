@@ -6,10 +6,9 @@ interface InputBarProps {
   onSubmit: (text: string) => void;
   onInterrupt: () => void;
   onKey: () => void;
-  onToggleGroup: () => void;
 }
 
-export function InputBar({ onSubmit, onInterrupt, onKey, onToggleGroup }: InputBarProps) {
+export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
   const [input, setInput] = useState("");
   const [lastInput, setLastInput] = useState("");
   const { isFocused } = useFocus({ id: "input", autoFocus: true });
@@ -18,7 +17,6 @@ export function InputBar({ onSubmit, onInterrupt, onKey, onToggleGroup }: InputB
   useInput((char, key) => {
     if (key.ctrl && char === "c") { process.exit(130); return; }
     if (key.escape) { setInput(lastInput); focus("input"); onInterrupt(); return; }
-    if (key.ctrl && char === "g") { onToggleGroup(); return; }
     if (!isFocused) return;
     if (!key.upArrow && !key.downArrow && !key.pageUp && !key.pageDown && !key.home && !key.end) onKey();
   });
@@ -50,8 +48,8 @@ export function InputBar({ onSubmit, onInterrupt, onKey, onToggleGroup }: InputB
       <Box paddingX={2}>
         <Text dimColor color="gray">
           {isFocused
-            ? "Tab: scroll mode  ·  ↑↓ PgUp PgDn: scroll  ·  ctrl+g: collapse  ·  Esc: interrupt"
-            : "j/k: select group  ·  enter: expand/collapse  ·  Tab: type mode  ·  ctrl+g: collapse"
+            ? "Tab: scroll mode  ·  Esc: interrupt"
+            : "j/k: select task  ·  ↑↓ PgUp PgDn Home End: scroll  ·  Tab: type mode"
           }
         </Text>
       </Box>

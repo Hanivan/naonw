@@ -73,36 +73,18 @@ class Store extends EventEmitter {
   logs: LogEntry[] = [];
   status: Status = { ...DEFAULT_STATUS };
   providers: ProviderData[] = [];
-  collapsedGroups: Set<string> = new Set();
-  private _groupCounter = 0;
-
-  startGroup(): string {
-    return `g${++this._groupCounter}`;
-  }
-
-  endGroup(id: string): void {
-    this.collapsedGroups.add(id);
-    this.emit("log");
-  }
-
-  toggleGroup(id: string): void {
-    if (this.collapsedGroups.has(id)) this.collapsedGroups.delete(id);
-    else this.collapsedGroups.add(id);
-    this.emit("log");
-  }
-
   pushLog(entry: LogEntry): void {
     this.logs.push(entry);
     if (this.logs.length > MAX_LOGS) this.logs.splice(0, this.logs.length - MAX_LOGS);
     this.emit("log");
   }
 
-  appendStream(chunk: string): void {
+  appendStream(chunk: string, groupId?: string): void {
     const last = this.logs[this.logs.length - 1];
     if (last && (last.level === "THINK" || last.level === "AGENT")) {
       this.logs[this.logs.length - 1] = { ...last, msg: last.msg + chunk };
     } else {
-      this.logs.push({ level: "AGENT", msg: chunk, timestamp: ts() });
+      this.logs.push({ level: "AGENT", msg: chunk, timestamp: ts(), groupId });
     }
     this.emit("log");
   }

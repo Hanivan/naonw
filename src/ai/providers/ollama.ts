@@ -44,6 +44,19 @@ export class OllamaClient extends DirectProvider {
     this.thinking = config.thinking ?? false;
   }
 
+  override async validate(): Promise<string | null> {
+    try {
+      const list = await this.ollama.list();
+      const has = list.models.some((m) => m.name === this.model || m.name.startsWith(`${this.model}:`));
+      if (has) return null;
+      const available = list.models.map((m) => m.name).join(", ") || "(none)";
+      return `model '${this.model}' not found at ${this.host}. Available: ${available}. Run: ollama pull ${this.model}`;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return `cannot reach ${this.host}: ${msg}`;
+    }
+  }
+
   addSystem(content: string): void {
     this.messages.push({ role: "system", content });
   }

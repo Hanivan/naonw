@@ -95,6 +95,17 @@ if (supportsVision || supportsThinking) {
   log.info(`vision ${supportsVision ? "●" : "○"}  think ${supportsThinking ? "●" : "○"}`);
 }
 
+// ── Pre-flight checks ─────────────────────────────────────
+// Validate AI provider config BEFORE Ink takes over the terminal so the user
+// sees a plain stderr message rather than a crash inside the alternate screen.
+{
+  const preflightErr = await ai.validate();
+  if (preflightErr !== null) {
+    process.stderr.write(`\nConfig error: ${preflightErr}\n\n`);
+    process.exit(1);
+  }
+}
+
 // ── Terminal setup ────────────────────────────────────────
 // Disable ALL mouse modes (clears any leftover state from crashed sessions)
 // then hide cursor. No mouse mode = text selection works natively.
