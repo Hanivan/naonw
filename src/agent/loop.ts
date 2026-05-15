@@ -236,13 +236,11 @@ export async function runAgentLoop(
         const lang = result.lang ?? (call.arguments.lang as string | undefined);
         const toolTag = lang ? `[lang: ${lang}]` : undefined;
         log.tool(call.name, call.arguments, response.provider, toolTag);
-        log.tokenTotal();
         return { success: true, summary: (call.arguments.summary as string) ?? result.text, lang };
       }
     }
   }
 
-  log.tokenTotal();
   if (signal?.aborted) return { success: false, summary: "Interrupted by user" };
   return { success: false, summary: "Max iterations reached" };
 }

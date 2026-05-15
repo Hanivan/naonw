@@ -1,4 +1,6 @@
+import { speakGemini } from "@/utils/gemini-tts.ts";
 import { readFileSync } from "node:fs";
+import { log } from "./logger";
 
 function detectBackend(): "sapi" | "say" | "espeak-ng" | "spd-say" | "none" {
   if (process.platform === "darwin") return "say";
@@ -8,8 +10,14 @@ function detectBackend(): "sapi" | "say" | "espeak-ng" | "spd-say" | "none" {
       const ver = readFileSync("/proc/version", "utf8").toLowerCase();
       if (ver.includes("microsoft") || ver.includes("wsl")) return "sapi";
     } catch {}
-    try { Bun.spawnSync(["espeak-ng", "--version"]); return "espeak-ng"; } catch {}
-    try { Bun.spawnSync(["spd-say", "--version"]); return "spd-say"; } catch {}
+    try {
+      Bun.spawnSync(["espeak-ng", "--version"]);
+      return "espeak-ng";
+    } catch {}
+    try {
+      Bun.spawnSync(["spd-say", "--version"]);
+      return "spd-say";
+    } catch {}
   }
   return "none";
 }
@@ -44,11 +52,21 @@ ${PS_PREAMBLE}
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 [Windows.Media.SpeechSynthesis.SpeechSynthesizer,Windows.Media.SpeechSynthesis,ContentType=WindowsRuntime]::AllVoices | ForEach-Object { $_.DisplayName + ' [' + $_.Language + ']' }
 `.trim();
-  const proc = Bun.spawnSync(["powershell.exe", "-NoProfile", "-EncodedCommand", encodePS(script)]);
-  return proc.stdout.toString().trim().split("\n").map((l) => l.trim()).filter(Boolean);
+  const proc = Bun.spawnSync([
+    "powershell.exe",
+    "-NoProfile",
+    "-EncodedCommand",
+    encodePS(script),
+  ]);
+  return proc.stdout
+    .toString()
+    .trim()
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 }
 
-export async function speak(text: string, lang = "en"): Promise<void> {
+export async function speakLocal(text: string, lang = "en"): Promise<void> {
   if (!text.trim() || BACKEND === "none") return;
   lastProc?.kill();
   lastProc = null;
@@ -75,7 +93,12 @@ $b=New-Object byte[] $st.Size;$r.ReadBytes($b)
 (New-Object System.Media.SoundPlayer $tmp).PlaySync()
 Remove-Item $tmp -Force -ErrorAction SilentlyContinue
 `.trim();
-    proc = Bun.spawn(["powershell.exe", "-NoProfile", "-EncodedCommand", encodePS(script)]);
+    proc = Bun.spawn([
+      "powershell.exe",
+      "-NoProfile",
+      "-EncodedCommand",
+      encodePS(script),
+    ]);
   } else if (BACKEND === "say") {
     proc = Bun.spawn(["say", text]);
   } else if (BACKEND === "espeak-ng") {
@@ -87,6 +110,19 @@ Remove-Item $tmp -Force -ErrorAction SilentlyContinue
   lastProc = proc;
   await proc.exited;
   lastProc = null;
+}
+
+export async function speak(text: string, lang = "en"): Promise<void> {
+  log.debug(
+    JSON.stringify({
+      text: text.slice(0, 10),
+      lang,
+    }),
+  );
+  if (process.env["GEMINI_API_KEY"]) {
+    return speakGemini(text);
+  }
+  return speakLocal(text, lang);
 }
 
 export function stopSpeak(): void {

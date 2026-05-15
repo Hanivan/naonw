@@ -1,6 +1,5 @@
 import { Box, Text } from "ink";
 import figlet from "figlet";
-import { ScrollView, type ScrollViewRef } from "ink-scroll-view";
 import type { LogEntry, ProviderData } from "@/ui/store.ts";
 
 const IS_FANCY = process.env.LOG_TYPE !== "old";
@@ -98,7 +97,7 @@ function CollapsedGroupLine({ count, isSelected }: { groupId: string; count: num
   const label = `↳ ${count} step${count !== 1 ? "s" : ""}`;
   return (
     <Box flexDirection="row" marginLeft={2}>
-      <Text dimColor color={isSelected ? "cyan" : undefined} bold={isSelected}>
+      <Text color={isSelected ? "cyan" : undefined} bold={isSelected} dimColor={!isSelected}>
         {label}
       </Text>
       {isSelected && <Text dimColor color="gray">  [ctrl+g / enter to expand]</Text>}
@@ -107,14 +106,13 @@ function CollapsedGroupLine({ count, isSelected }: { groupId: string; count: num
 }
 
 // ── Render item types ─────────────────────────────────────────────────────────
-type RenderItem =
+export type RenderItem =
   | { type: "entry"; entry: LogEntry; key: number }
   | { type: "collapsed"; groupId: string; count: number }
   | { type: "group-footer"; groupId: string };
 
-function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>): RenderItem[] {
+export function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>): RenderItem[] {
   const seenGroups = new Set<string>();
-  const expandedGroups = new Set<string>();
   const groupCounts = new Map<string, number>();
   for (const e of logs) {
     if (e.groupId) groupCounts.set(e.groupId, (groupCounts.get(e.groupId) ?? 0) + 1);
@@ -136,9 +134,7 @@ function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>): Rende
         idx++;
       }
     } else {
-      expandedGroups.add(gid);
       result.push({ type: "entry", entry, key: idx++ });
-      // inject footer after the last entry of this group
       const nextGid = logs[i + 1]?.groupId;
       if (nextGid !== gid) {
         result.push({ type: "group-footer", groupId: gid });
@@ -148,15 +144,7 @@ function buildRenderItems(logs: LogEntry[], collapsedGroups: Set<string>): Rende
   return result;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-interface LogPaneProps {
-  logs: LogEntry[];
-  paneHeight: number;
-  scrollRef: React.RefObject<ScrollViewRef | null>;
-  collapsedGroups: Set<string>;
-  selectedGroupId: string | null;
-}
-
+// ── Entry renderer ────────────────────────────────────────────────────────────
 function renderEntry(entry: LogEntry, key: number) {
   if (!IS_FANCY) {
     return (
@@ -171,37 +159,43 @@ function renderEntry(entry: LogEntry, key: number) {
   return <FancyEntry key={key} entry={entry} />;
 }
 
-export function LogPane({ logs, paneHeight, scrollRef, collapsedGroups, selectedGroupId }: LogPaneProps) {
-  const items = buildRenderItems(logs, collapsedGroups);
+// ── Component ─────────────────────────────────────────────────────────────────
+interface LogPaneProps {
+  items: RenderItem[];
+  scrollTop: number;
+  paneHeight: number;
+  selectedGroupId: string | null;
+  lastGroupId: string | null;
+}
 
-  let lastGroupId: string | null = null;
-  for (const e of logs) if (e.groupId) lastGroupId = e.groupId;
-
+export function LogPane({ items, scrollTop, paneHeight, selectedGroupId, lastGroupId }: LogPaneProps) {
+  const visible = items.slice(scrollTop, scrollTop + paneHeight);
   return (
     <Box height={paneHeight} flexDirection="column">
-      <ScrollView ref={scrollRef}>
-        {items.map((item) => {
-          if (item.type === "collapsed") {
-            return (
-              <CollapsedGroupLine
-                key={`cg-${item.groupId}`}
-                groupId={item.groupId}
-                count={item.count}
-                isSelected={item.groupId === selectedGroupId}
-              />
-            );
-          }
-          if (item.type === "group-footer") {
-            if (item.groupId !== lastGroupId) return null;
-            return (
-              <Box key={`gf-${item.groupId}`} marginLeft={2}>
-                <Text dimColor color="gray">[ctrl+g to collapse]</Text>
-              </Box>
-            );
-          }
-          return renderEntry(item.entry, item.key);
-        })}
-      </ScrollView>
+      {visible.map((item) => {
+        if (item.type === "collapsed") {
+          return (
+            <CollapsedGroupLine
+              key={`cg-${item.groupId}`}
+              groupId={item.groupId}
+              count={item.count}
+              isSelected={item.groupId === selectedGroupId}
+            />
+          );
+        }
+        if (item.type === "group-footer") {
+          if (item.groupId !== lastGroupId && item.groupId !== selectedGroupId) return null;
+          const isSelected = item.groupId === selectedGroupId;
+          return (
+            <Box key={`gf-${item.groupId}`} marginLeft={2}>
+              <Text color={isSelected ? "cyan" : undefined} bold={isSelected} dimColor={!isSelected}>
+                {isSelected ? "[enter to collapse]" : "[ctrl+g to collapse]"}
+              </Text>
+            </Box>
+          );
+        }
+        return renderEntry(item.entry, item.key);
+      })}
     </Box>
   );
 }

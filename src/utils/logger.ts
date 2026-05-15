@@ -91,12 +91,6 @@ export const log = {
       tokensOut: store.status.tokensOut + pout,
     });
   },
-  tokenTotal(): void {
-    const { tokensIn, tokensOut } = store.status;
-    const msg = `${tokensIn} in → ${tokensOut} out (${tokensIn + tokensOut} total)`;
-    store.pushLog({ level: "TOKEN", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
-    writeFile("TOKEN", msg);
-  },
   success(msg: string): void {
     if (activeGroupId) { store.endGroup(activeGroupId); activeGroupId = null; }
     store.pushLog({ level: "DONE", msg, timestamp: ts() });

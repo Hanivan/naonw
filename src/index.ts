@@ -152,6 +152,8 @@ try {
       ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`
       : `${elapsedSec}s`;
 
+    const { tokensIn, tokensOut } = store.status;
+    const tokenStr = `${tokensIn} in → ${tokensOut} out (${tokensIn + tokensOut} total)`;
     if (result.success) {
       log.success(result.summary);
       lastSummary = result.summary;
@@ -160,7 +162,7 @@ try {
       log.fail(result.summary);
       lastSummary = "";
     }
-    log.info(`⁂ Worked for ${elapsedStr}`);
+    log.info(`⁂ Worked for ${elapsedStr} · ${tokenStr}`);
 
     if (await isYouTubePlaying()) {
       log.info("YouTube video playing — browser stays open.");

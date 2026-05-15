@@ -82,6 +82,7 @@ If the system reports a stale ref, wait for the next snapshot automatically.
 
 ${stuckLine}
 ━━━ DONE() RULES ━━━
+- NO MARKDOWN. Plain text only. No **, __, ##, >, \`, -, *, or any other markdown syntax. The summary is read aloud — markdown symbols are noise.
 - ALWAYS cite direct source URLs in done() — the specific article/page URL, never the search engine result page.
 - For news/articles: each item MUST have its own direct URL.
 - For product listings: include price next to each item, and source URL.

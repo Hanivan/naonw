@@ -1,9 +1,8 @@
 import { Box, Text, useInput, useFocus } from "ink";
 import { useRef, useEffect, forwardRef, useImperativeHandle, useState, useMemo } from "react";
-import { LogPane } from "@/ui/log-pane.tsx";
+import { LogPane, buildRenderItems } from "@/ui/log-pane.tsx";
 import { useMouseWheel } from "@/utils/use-mouse-wheel.ts";
 import type { LogEntry } from "@/ui/store.ts";
-import type { ScrollViewRef } from "ink-scroll-view";
 
 export interface LogPanelRef {
   scrollToBottom: () => void;
@@ -20,13 +19,18 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   { logs, paneHeight, collapsedGroups, onToggleGroup },
   ref,
 ) {
-  const scrollRef = useRef<ScrollViewRef>(null);
-  const atBottomRef = useRef(true);
   const { isFocused } = useFocus({ id: "log" });
   const isFocusedRef = useRef(isFocused);
   isFocusedRef.current = isFocused;
 
+  const [scrollTop, setScrollTop] = useState(0);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const atBottomRef = useRef(true);
+
+  const items = useMemo(
+    () => buildRenderItems(logs, collapsedGroups),
+    [logs, collapsedGroups],
+  );
 
   const allGroupIds = useMemo(() => {
     const seen = new Set<string>();
@@ -37,70 +41,92 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     return result;
   }, [logs]);
 
-  const collapsedGroupIds = useMemo(
-    () => allGroupIds.filter((id) => collapsedGroups.has(id)),
-    [allGroupIds, collapsedGroups],
-  );
+  let lastGroupId: string | null = null;
+  for (const e of logs) if (e.groupId) lastGroupId = e.groupId;
 
-  // Auto-select last collapsed group; preserve selection if still collapsed
+  const hintHeight = isFocused && allGroupIds.length > 0 ? 1 : 0;
+  const effectivePaneHeight = Math.max(1, paneHeight - hintHeight);
+  const maxScroll = Math.max(0, items.length - effectivePaneHeight);
+
+  // Auto-select last group (any state); preserve selection if group still exists
   useEffect(() => {
     setSelectedGroupId((prev) => {
-      if (prev && collapsedGroups.has(prev)) return prev;
-      return collapsedGroupIds[collapsedGroupIds.length - 1] ?? null;
+      if (prev && allGroupIds.includes(prev)) return prev;
+      return allGroupIds[allGroupIds.length - 1] ?? null;
     });
-  }, [collapsedGroupIds, collapsedGroups]);
+  }, [allGroupIds]);
+
+  // Auto-scroll to bottom when new items arrive and user is pinned to bottom
+  useEffect(() => {
+    if (atBottomRef.current) {
+      setScrollTop(Math.max(0, items.length - effectivePaneHeight));
+    }
+  }, [items.length, effectivePaneHeight]);
+
+  // Scroll to keep selected group in view after j/k navigation
+  useEffect(() => {
+    if (!selectedGroupId) return;
+    const idx = items.findIndex(
+      (it) => (it.type === "collapsed" || it.type === "group-footer") && it.groupId === selectedGroupId,
+    );
+    if (idx < 0) return;
+    setScrollTop((prev) => {
+      if (idx < prev) return idx;
+      if (idx >= prev + effectivePaneHeight) return idx - effectivePaneHeight + 1;
+      return prev;
+    });
+  }, [selectedGroupId, items, effectivePaneHeight]);
 
   useImperativeHandle(ref, () => ({
     scrollToBottom() {
       atBottomRef.current = true;
-      scrollRef.current?.scrollToBottom();
+      setScrollTop(Math.max(0, items.length - effectivePaneHeight));
     },
-  }), []);
-
-  useEffect(() => {
-    if (atBottomRef.current) scrollRef.current?.scrollToBottom();
-  });
+  }), [items.length, effectivePaneHeight]);
 
   useMouseWheel({
     onWheelUp: () => {
       if (!isFocusedRef.current) return;
       atBottomRef.current = false;
-      scrollRef.current?.scrollBy(-3);
+      setScrollTop((p) => Math.max(0, p - 3));
     },
     onWheelDown: () => {
       if (!isFocusedRef.current) return;
-      atBottomRef.current = true;
-      scrollRef.current?.scrollBy(3);
-    },
-    onLeftClick: () => {
-      if (selectedGroupId) onToggleGroup(selectedGroupId);
+      setScrollTop((p) => {
+        const n = Math.min(maxScroll, p + 3);
+        if (n >= maxScroll) atBottomRef.current = true;
+        return n;
+      });
     },
   });
 
-  // Always-registered handler — check isFocusedRef manually to avoid
-  // the effect re-registration timing gap that { isActive: isFocused } causes.
+  // Always-registered — no { isActive } to avoid effect re-registration timing gap.
+  // Scroll keys fire unconditionally; group nav gates on isFocusedRef.
   useInput((char, key) => {
-    if (key.home) { atBottomRef.current = false; scrollRef.current?.scrollToTop(); }
-    if (key.end) { atBottomRef.current = true; scrollRef.current?.scrollToBottom(); }
+    if (key.home) { atBottomRef.current = false; setScrollTop(0); }
+    if (key.end)  { atBottomRef.current = true;  setScrollTop(maxScroll); }
     if (key.upArrow || key.pageUp) {
       atBottomRef.current = false;
-      scrollRef.current?.scrollBy(key.upArrow ? -3 : -paneHeight);
+      setScrollTop((p) => Math.max(0, p - (key.upArrow ? 1 : effectivePaneHeight)));
     }
     if (key.downArrow || key.pageDown) {
-      atBottomRef.current = true;
-      scrollRef.current?.scrollBy(key.downArrow ? 3 : paneHeight);
+      setScrollTop((p) => {
+        const n = Math.min(maxScroll, p + (key.downArrow ? 1 : effectivePaneHeight));
+        if (n >= maxScroll) atBottomRef.current = true;
+        return n;
+      });
     }
 
     if (!isFocusedRef.current) return;
 
-    if (char === "j" && collapsedGroupIds.length > 0) {
-      const idx = selectedGroupId !== null ? collapsedGroupIds.indexOf(selectedGroupId) : -1;
-      const next = collapsedGroupIds[(idx + 1) % collapsedGroupIds.length];
+    if (char === "j" && allGroupIds.length > 0) {
+      const idx = selectedGroupId !== null ? allGroupIds.indexOf(selectedGroupId) : -1;
+      const next = allGroupIds[(idx + 1) % allGroupIds.length];
       if (next !== undefined) setSelectedGroupId(next);
     }
-    if (char === "k" && collapsedGroupIds.length > 0) {
-      const idx = selectedGroupId !== null ? collapsedGroupIds.indexOf(selectedGroupId) : collapsedGroupIds.length;
-      const prev = collapsedGroupIds[(idx - 1 + collapsedGroupIds.length) % collapsedGroupIds.length];
+    if (char === "k" && allGroupIds.length > 0) {
+      const idx = selectedGroupId !== null ? allGroupIds.indexOf(selectedGroupId) : allGroupIds.length;
+      const prev = allGroupIds[(idx - 1 + allGroupIds.length) % allGroupIds.length];
       if (prev !== undefined) setSelectedGroupId(prev);
     }
     if (key.return && selectedGroupId) {
@@ -108,15 +134,22 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     }
   });
 
-  const hintHeight = isFocused && collapsedGroupIds.length > 0 ? 1 : 0;
+  const selectedIsCollapsed = selectedGroupId !== null && collapsedGroups.has(selectedGroupId);
 
   return (
     <Box flexDirection="column" height={paneHeight}>
-      <LogPane logs={logs} paneHeight={paneHeight - hintHeight} scrollRef={scrollRef}
-               collapsedGroups={collapsedGroups} selectedGroupId={selectedGroupId} />
-      {isFocused && collapsedGroupIds.length > 0 && (
+      <LogPane
+        items={items}
+        scrollTop={scrollTop}
+        paneHeight={effectivePaneHeight}
+        selectedGroupId={selectedGroupId}
+        lastGroupId={lastGroupId}
+      />
+      {isFocused && allGroupIds.length > 0 && (
         <Box paddingX={1}>
-          <Text dimColor color="gray">j/k: select group  ·  enter: toggle</Text>
+          <Text dimColor color="gray">
+            {`j/k: select group  ·  enter: ${selectedIsCollapsed ? "expand" : "collapse"}`}
+          </Text>
         </Box>
       )}
     </Box>
