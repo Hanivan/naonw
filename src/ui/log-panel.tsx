@@ -62,6 +62,7 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   const [scrollOffset, setScrollOffset] = useState(0);
   const atBottomRef = useRef(true);
   const prevLastIndexRef = useRef<number | null>(null);
+  const prevLiveIndexRef = useRef<number | null>(null);
 
   const tasks = useMemo<TaskInfo[]>(() => deriveTasks(logs), [logs]);
   const lastIndex = tasks.length === 0 ? null : tasks[tasks.length - 1]!.index;
@@ -76,19 +77,21 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
       atBottomRef.current = true;
       setScrollOffset(0);
       prevLastIndexRef.current = lastIndex;
+      prevLiveIndexRef.current = liveIndex;
       return;
     }
     if (lastIndex !== null && lastIndex !== prevLastIndexRef.current) {
       // A new task was added.
-      if (selectedIndex === prevLastIndexRef.current) {
+      if (selectedIndex === prevLiveIndexRef.current) {
         // User was on the previously-LIVE task: follow.
         setSelectedIndex(lastIndex);
         atBottomRef.current = true;
         setScrollOffset(0);
       }
       prevLastIndexRef.current = lastIndex;
+      prevLiveIndexRef.current = liveIndex;
     }
-  }, [lastIndex, selectedIndex]);
+  }, [lastIndex, liveIndex, selectedIndex]);
 
   const selectedTask = useMemo(
     () => (selectedIndex === null ? null : tasks.find((t) => t.index === selectedIndex) ?? null),
@@ -135,25 +138,21 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
 
     // Task navigation: j/k
     if (char === "j" && tasks.length > 0) {
-      setSelectedIndex((cur) => {
-        const curIdx = cur ?? tasks[0]!.index;
-        const pos = tasks.findIndex((t) => t.index === curIdx);
-        const next = tasks[(pos + 1) % tasks.length]!.index;
-        atBottomRef.current = true;
-        setScrollOffset(0);
-        return next;
-      });
+      const curIdx = selectedIndex ?? tasks[0]!.index;
+      const pos = tasks.findIndex((t) => t.index === curIdx);
+      const next = tasks[(pos + 1) % tasks.length]!.index;
+      atBottomRef.current = true;
+      setScrollOffset(0);
+      setSelectedIndex(next);
       return;
     }
     if (char === "k" && tasks.length > 0) {
-      setSelectedIndex((cur) => {
-        const curIdx = cur ?? tasks[0]!.index;
-        const pos = tasks.findIndex((t) => t.index === curIdx);
-        const prev = tasks[(pos - 1 + tasks.length) % tasks.length]!.index;
-        atBottomRef.current = true;
-        setScrollOffset(0);
-        return prev;
-      });
+      const curIdx = selectedIndex ?? tasks[0]!.index;
+      const pos = tasks.findIndex((t) => t.index === curIdx);
+      const prev = tasks[(pos - 1 + tasks.length) % tasks.length]!.index;
+      atBottomRef.current = true;
+      setScrollOffset(0);
+      setSelectedIndex(prev);
       return;
     }
 
