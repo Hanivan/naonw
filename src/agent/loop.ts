@@ -38,8 +38,9 @@ export async function runAgentLoop(
 
   async function ensurePage(): Promise<Page> {
     if (!page) {
-      log.info("Launching browser...");
-      page = await browser.launch(currentHeadless);
+      const cdpUrl = process.env.NAONW_CDP_URL;
+      log.info(cdpUrl ? "Connecting via CDP..." : "Launching browser...");
+      page = await browser.connectOrLaunch(currentHeadless);
       store.setStatus({ browserOpen: true });
     }
     return page;
@@ -88,7 +89,7 @@ export async function runAgentLoop(
         log.captcha("CAPTCHA detected — injecting solveCaptcha hint for AI");
         ai.addUser("CAPTCHA is visible. Call solveCaptcha() to get a screenshot and challenge text, then clickCaptchaTile() to select matching tiles.");
       } else {
-        if (currentHeadless) {
+        if (currentHeadless && !browser.isCdp()) {
           log.captcha("CAPTCHA detected — relaunching browser as visible...");
           page = await browser.relaunch(false);
           currentHeadless = false;
@@ -97,7 +98,7 @@ export async function runAgentLoop(
         log.captcha("Solve it in the browser, then press Enter to continue...");
         if (waitForInput) await waitForInput();
         else await waitForEnter();
-        if (currentHeadless !== headless) {
+        if (!browser.isCdp() && currentHeadless !== headless) {
           log.captcha(`Switching back to ${headless ? "headless" : "visible"}...`);
           page = await browser.relaunch(headless);
           currentHeadless = headless;
