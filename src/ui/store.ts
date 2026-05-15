@@ -17,8 +17,7 @@ export type LogLevel =
   | "DEBUG"
   | "TOKEN"
   | "DONE"
-  | "FAIL"
-  | "PROVIDER";
+  | "FAIL";
 
 export type ProviderData = {
   name: string;
@@ -31,7 +30,6 @@ export type LogEntry = {
   level: LogLevel;
   msg: string;
   timestamp: string;
-  data?: ProviderData;
   groupId?: string;
 };
 
@@ -74,6 +72,7 @@ const MAX_LOGS = 2000;
 class Store extends EventEmitter {
   logs: LogEntry[] = [];
   status: Status = { ...DEFAULT_STATUS };
+  providers: ProviderData[] = [];
   collapsedGroups: Set<string> = new Set();
   private _groupCounter = 0;
 
@@ -106,6 +105,11 @@ class Store extends EventEmitter {
       this.logs.push({ level: "AGENT", msg: chunk, timestamp: ts() });
     }
     this.emit("log");
+  }
+
+  addProvider(p: ProviderData): void {
+    this.providers = [...this.providers, p];
+    this.emit("providers");
   }
 
   setStatus(patch: Partial<Status>): void {

@@ -1,18 +1,37 @@
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useState, useEffect } from "react";
-import type { Status } from "@/ui/store.ts";
+import type { Status, ProviderData } from "@/ui/store.ts";
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
   return s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
 }
 
-interface HeaderBarProps {
-  status: Status;
+function abbrevModel(model: string): string {
+  // strip provider-prefix (e.g. "openrouter/owl-alpha" → "owl-alpha")
+  const slash = model.lastIndexOf("/");
+  const base = slash >= 0 ? model.slice(slash + 1) : model;
+  return base.length > 16 ? base.slice(0, 15) + "…" : base;
 }
 
-export function HeaderBar({ status }: HeaderBarProps) {
+function ProviderChip({ p, active }: { p: ProviderData; active: boolean }) {
+  const nameColor = active ? "cyan" : "gray";
+  return (
+    <Box flexDirection="row">
+      <Text color={nameColor} bold={active}>{p.name}</Text>
+      <Text color="gray" dimColor>/{abbrevModel(p.model)}</Text>
+      {p.cloud && <Text color="yellow" dimColor> ☁</Text>}
+    </Box>
+  );
+}
+
+interface HeaderBarProps {
+  status: Status;
+  providers: ProviderData[];
+}
+
+export function HeaderBar({ status, providers }: HeaderBarProps) {
   const [now, setNow] = useState(Date.now);
 
   const running = status.agentStatus === "thinking" || status.agentStatus === "tool";
@@ -24,11 +43,7 @@ export function HeaderBar({ status }: HeaderBarProps) {
   }, [running]);
 
   const urlDisplay = status.currentUrl
-    ? status.currentUrl.replace(/^https?:\/\//, "").slice(0, 40)
-    : "—";
-
-  const providerLabel = status.provider
-    ? `${status.provider}${status.model ? `/${status.model}` : ""}`
+    ? status.currentUrl.replace(/^https?:\/\//, "").slice(0, 35)
     : "—";
 
   const totalTokens = status.tokensIn + status.tokensOut;
@@ -51,20 +66,33 @@ export function HeaderBar({ status }: HeaderBarProps) {
       borderRight={false}
       borderBottom
     >
+      {/* Row 1: identity + providers + url + browser */}
       <Box paddingX={1} gap={2}>
         <Text color="blueBright" bold>◆ Naonw</Text>
         <Text color="gray" dimColor>│</Text>
-        <Text color="gray">MDL <Text color="cyan">{providerLabel}</Text></Text>
+        {providers.length === 0 ? (
+          <Text color="gray" dimColor>no providers</Text>
+        ) : (
+          <Box gap={2}>
+            {providers.map((p, i) => (
+              <ProviderChip key={i} p={p} active={p.name === status.provider} />
+            ))}
+          </Box>
+        )}
         <Text color="gray" dimColor>│</Text>
-        <Text color="gray">URL <Text color="yellow">{urlDisplay}</Text></Text>
+        <Text color="gray" dimColor>URL <Text color="yellow">{urlDisplay}</Text></Text>
         <Text color="gray" dimColor>│</Text>
         <Text color={status.browserOpen ? "green" : "gray"} dimColor={!status.browserOpen}>
           {status.browserOpen ? "● browser" : "○ browser"}
         </Text>
       </Box>
+      {/* Row 2: live agent state */}
       <Box paddingX={1} gap={2}>
         {running ? (
-          <Text color={statusColor}><Spinner type="dots" /> {elapsed}{statusLabel ? <Text dimColor>  {statusLabel}</Text> : null}</Text>
+          <Text color={statusColor}>
+            <Spinner type="dots" />{" "}{elapsed}
+            {statusLabel && <Text dimColor>  {statusLabel}</Text>}
+          </Text>
         ) : done ? (
           <Text color={statusColor}>⁂ {elapsed}</Text>
         ) : interrupted ? (

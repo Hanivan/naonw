@@ -30,8 +30,8 @@ export { writeFile as writeLog };
 export const log = {
   brand(_msg: string): void {},
   provider(name: string, model: string, cloud: boolean, keys: number): void {
-    const data: ProviderData = { name, model, cloud, keys };
-    store.pushLog({ level: "PROVIDER", msg: `${name} ${model}`, timestamp: ts(), data });
+    store.addProvider({ name, model, cloud, keys });
+    writeFile("PROVIDER", `${name} ${model}${cloud ? " cloud" : ""}  ${keys} key${keys !== 1 ? "s" : ""}`);
   },
   info(msg: string): void {
     store.pushLog({ level: "INFO", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });

@@ -1,5 +1,5 @@
 import { Box, Text } from "ink";
-import type { LogEntry, ProviderData } from "@/ui/store.ts";
+import type { LogEntry } from "@/ui/store.ts";
 
 const IS_FANCY = process.env.LOG_TYPE !== "old";
 
@@ -59,22 +59,6 @@ function FancyEntry({ entry }: { entry: LogEntry }) {
     <Box flexDirection="row" marginLeft={indent}>
       <Text color={color} bold={bold}>{symbol} </Text>
       <Text wrap="wrap" bold={bold} dimColor={dim}>{fancyMsg(entry)}</Text>
-    </Box>
-  );
-}
-
-function ProviderEntry({ entry }: { entry: LogEntry }) {
-  const d = entry.data as ProviderData | undefined;
-  if (!d) return <FancyEntry entry={entry} />;
-  const name     = d.name.padEnd(10, " ");
-  const keyLabel = d.keys === 1 ? "1 key" : `${d.keys} keys`;
-  return (
-    <Box flexDirection="row" marginLeft={2}>
-      <Text color="cyan">{name}</Text>
-      <Text color="gray" dimColor>› </Text>
-      <Text color="white">{d.model}</Text>
-      {d.cloud && <Text color="yellow" dimColor>  cloud</Text>}
-      <Text color="gray" dimColor>  {keyLabel}</Text>
     </Box>
   );
 }
@@ -141,7 +125,6 @@ function renderEntry(entry: LogEntry, key: number) {
       </Box>
     );
   }
-  if (entry.level === "PROVIDER") return <ProviderEntry key={key} entry={entry} />;
   return <FancyEntry key={key} entry={entry} />;
 }
 
