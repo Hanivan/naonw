@@ -1,6 +1,7 @@
 import { Box, Text, useInput, useFocus, useFocusManager } from "ink";
 import { TextInput } from "@/ui/text-input.tsx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { store } from "@/ui/store.ts";
 
 interface InputBarProps {
   onSubmit: (text: string) => void;
@@ -11,6 +12,12 @@ interface InputBarProps {
 export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
   const [input, setInput] = useState("");
   const [lastInput, setLastInput] = useState("");
+  const [captchaPending, setCaptchaPending] = useState(store.captchaPending);
+  useEffect(() => {
+    const onCaptcha = () => setCaptchaPending(store.captchaPending);
+    store.on("captcha", onCaptcha);
+    return () => { store.off("captcha", onCaptcha); };
+  }, []);
   const { isFocused } = useFocus({ id: "input", autoFocus: true });
   const { focus } = useFocusManager();
 
@@ -47,10 +54,11 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
       </Box>
       <Box paddingX={2}>
         <Text dimColor color="gray">
-          {isFocused
-            ? "Tab: scroll mode  ·  Esc: interrupt"
-            : "j/k: select task  ·  ↑↓ PgUp PgDn Home End: scroll  ·  Tab: type mode"
-          }
+          {captchaPending
+            ? "Enter (empty): resolve captcha  ·  text+Enter: queue task  ·  Esc: abort"
+            : isFocused
+              ? "Tab: scroll mode  ·  Esc: interrupt"
+              : "j/k: select task  ·  ↑↓ PgUp PgDn Home End: scroll  ·  d: delete queued  ·  Tab: type mode"}
         </Text>
       </Box>
     </Box>
