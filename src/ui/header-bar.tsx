@@ -2,6 +2,7 @@ import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { useState, useEffect } from "react";
 import type { Status, ProviderData } from "@/ui/store.ts";
+import { compactNum } from "@/utils/format.ts";
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -102,9 +103,9 @@ export function HeaderBar({ status, providers }: HeaderBarProps) {
         )}
         <Text color="gray" dimColor>iter <Text color="magenta">{status.iteration}</Text>/{status.maxIterations}</Text>
         <Box gap={1}>
-          <Text color="blue">↑{status.tokensIn}</Text>
-          <Text color="green">↓{status.tokensOut}</Text>
-          <Text color="gray">Σ{totalTokens}</Text>
+          <Text color="blue">↑{compactNum(status.tokensIn)}</Text>
+          <Text color="green">↓{compactNum(status.tokensOut)}</Text>
+          <Text color="gray">Σ{compactNum(totalTokens)}</Text>
         </Box>
       </Box>
     </Box>

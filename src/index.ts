@@ -11,6 +11,7 @@ import { App } from "@/ui/app.tsx";
 import { log, initLog, writeLog } from "@/utils/logger.ts";
 import { toMessage } from "@/utils/errors.ts";
 import { speak, stopSpeak } from "@/utils/tts.ts";
+import { compactNum } from "@/utils/format.ts";
 
 function parseKeys(raw: string | undefined): string[] | undefined {
   if (!raw) return undefined;
@@ -205,7 +206,7 @@ try {
       : `${elapsedSec}s`;
 
     const { tokensIn, tokensOut } = store.status;
-    const tokenStr = `${tokensIn} in → ${tokensOut} out (${tokensIn + tokensOut} total)`;
+    const tokenStr = `${compactNum(tokensIn)} in → ${compactNum(tokensOut)} out (${compactNum(tokensIn + tokensOut)} total)`;
     if (result.success) {
       log.success(result.summary);
       lastSummary = result.summary;
