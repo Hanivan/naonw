@@ -205,8 +205,9 @@ try {
       ? `${Math.floor(elapsedSec / 60)}m ${elapsedSec % 60}s`
       : `${elapsedSec}s`;
 
-    const { tokensIn, tokensOut } = store.status;
+    const { tokensIn, tokensOut, iteration } = store.status;
     const tokenStr = `${compactNum(tokensIn)} in → ${compactNum(tokensOut)} out (${compactNum(tokensIn + tokensOut)} total)`;
+    const iterStr = `${iteration} iter${iteration !== 1 ? "s" : ""}`;
     if (result.success) {
       log.success(result.summary);
       lastSummary = result.summary;
@@ -215,7 +216,7 @@ try {
       log.fail(result.summary);
       lastSummary = "";
     }
-    log.info(`⁂ Worked for ${elapsedStr} · ${tokenStr}`);
+    log.info(`⁂ Worked for ${elapsedStr} with ${iterStr} · ${tokenStr}`);
 
     if (await isYouTubePlaying()) {
       log.info("YouTube video playing — browser stays open.");
