@@ -5,6 +5,7 @@ let activeGroupId: string | null = null;
 let groupCounter = 0;
 
 const LOG_FILE = process.env.LOG_FILE ?? "logs/run.log";
+const AI_LOG_FILE = process.env.AI_LOG_FILE ?? "logs/ai-context.log";
 
 function ts(): string {
   return new Date().toISOString().slice(5, 23).replace("T", " ");
@@ -22,7 +23,21 @@ function writeFile(level: string, msg: string): void {
 
 export function initLog(): void {
   try {
-    writeFileSync(LOG_FILE, `=== Naonw ${new Date().toISOString()} ===\n`);
+    const ttsOn = process.env.TTS !== "false";
+    const tts = !ttsOn ? "tts=off" : process.env["GEMINI_API_KEY"] ? "tts=gemini" : "tts=local";
+    writeFileSync(LOG_FILE, `=== Naonw ${new Date().toISOString()} · ${tts} ===\n`);
+    writeFileSync(AI_LOG_FILE, `=== Naonw AI context ${new Date().toISOString()} ===\n`);
+  } catch {}
+}
+
+/**
+ * Append a labelled entry to the dedicated AI-context log (logs/ai-context.log).
+ * Use this for everything the agent feeds into / receives from the LLM:
+ * SYSTEM, USER, TASK, SNAPSHOT, TOOL_RESULT, IMAGE, RESPONSE, etc.
+ */
+export function logAI(label: string, content: string): void {
+  try {
+    appendFileSync(AI_LOG_FILE, `\n──── ${ts()} ${label} ────\n${content}\n`);
   } catch {}
 }
 

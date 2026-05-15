@@ -9,7 +9,7 @@ import { diffSnapshots } from "@/browser/snapshot-diff.ts";
 import { detectCaptcha } from "@/browser/detectors.ts";
 import { toolDefinitions } from "@/agent/tools/definitions.ts";
 import { executeTool } from "@/agent/tools/execute.ts";
-import { log } from "@/utils/logger.ts";
+import { log, writeLog, logAI } from "@/utils/logger.ts";
 import { waitForEnter } from "@/utils/prompt.ts";
 import { store } from "@/ui/store.ts";
 
@@ -60,8 +60,11 @@ export async function runAgentLoop(
 
   const supportsVision = process.env.VISION === "true";
   const activeTools = supportsVision ? toolDefinitions : toolDefinitions.filter((t) => t.name !== "screenshot");
-  ai.addSystem(buildSystemPrompt(supportsVision));
+  const sysPrompt = buildSystemPrompt(supportsVision, MAX_ITERATIONS, headless);
+  ai.addSystem(sysPrompt);
   ai.addUser(userPrompt);
+  logAI("SYSTEM", sysPrompt);
+  logAI("TASK", userPrompt);
 
   let lastUrl = "";
   let sameUrlCount = 0;
@@ -88,7 +91,9 @@ export async function runAgentLoop(
     if (page && await detectCaptcha(page)) {
       if (supportsVision) {
         log.captcha("CAPTCHA detected — injecting solveCaptcha hint for AI");
-        ai.addUser("CAPTCHA is visible. Call solveCaptcha() to get a screenshot and challenge text, then clickCaptchaTile() to select matching tiles.");
+        const hint = "CAPTCHA is visible. Call solveCaptcha() to get a screenshot and challenge text, then clickCaptchaTile() to select matching tiles.";
+        logAI("USER (captcha-hint)", hint);
+        ai.addUser(hint);
       } else {
         if (currentHeadless && !browser.isCdp()) {
           log.captcha("CAPTCHA detected — relaunching browser as visible...");
@@ -136,7 +141,21 @@ export async function runAgentLoop(
         snapshotContext = diff.compact || "(no changes)";
       }
 
+      const interactive = prevNodes.filter((n) => !n.hidden && n.ref);
+      const refLines = interactive.map((n) => {
+        const parts = [`${n.ref}:${n.role}`];
+        if (n.name) parts.push(`"${n.name}"`);
+        if (n.value !== undefined) parts.push(`val="${n.value}"`);
+        if (n.placeholder) parts.push(`placeholder="${n.placeholder}"`);
+        if (n.testid) parts.push(`testid="${n.testid}"`);
+        if (n.focused) parts.push("*");
+        if (n.disabled) parts.push("-");
+        return "  " + parts.join(" ");
+      });
+      writeLog("REFS", `(${interactive.length})\n${refLines.join("\n")}`);
+
       log.debug(`PAGE STATE:\n${snapshotContext}`);
+      logAI(`SNAPSHOT iter=${i + 1} url=${page.url()}`, snapshotContext);
       ai.addUser(snapshotContext);
     }
 
@@ -154,6 +173,17 @@ export async function runAgentLoop(
 
     const provTag = `[${response.provider}]`;
     store.setStatus({ provider: response.provider });
+
+    {
+      const callsStr = response.toolCalls.length
+        ? response.toolCalls.map((c) => `  → ${c.name}(${JSON.stringify(c.arguments)})`).join("\n")
+        : "  (no tool calls)";
+      const parts: string[] = [];
+      if (response.thinking) parts.push(`thinking:\n${response.thinking}`);
+      if (response.content) parts.push(`content:\n${response.content}`);
+      parts.push(`tool_calls:\n${callsStr}`);
+      logAI(`RESPONSE iter=${i + 1} provider=${response.provider}`, parts.join("\n"));
+    }
 
     if (!response.streamed) {
       if (response.thinking) log.think(response.thinking);
@@ -180,7 +210,9 @@ export async function runAgentLoop(
         if (typeable) hints.push(`To type: type("${typeable.ref}", "your text", true)`);
         if (clickable) hints.push(`To click: click("${clickable.ref}")`);
         const hintStr = hints.length ? `\nAvailable actions:\n${hints.join("\n")}` : "";
-        ai.addUser(`STOP writing text. Call a tool NOW.${hintStr}\nIf task is done: done("summary", "en")`);
+        const nudge = `STOP writing text. Call a tool NOW.${hintStr}\nIf task is done: done("summary", "en")`;
+        logAI("USER (nudge)", nudge);
+        ai.addUser(nudge);
       }
       continue;
     }
@@ -189,7 +221,9 @@ export async function runAgentLoop(
       const actionKey = `${call.name}:${JSON.stringify(call.arguments)}`;
       if (actionKey === lastToolAction && call.name !== "done") {
         log.warn(`Duplicate action detected: ${call.name} — skipping`);
-        ai.addToolResult(call.name, `Skipped: you already did this exact action. Try something different or call done().`);
+        const skipMsg = `Skipped: you already did this exact action. Try something different or call done().`;
+        logAI(`TOOL_RESULT ${call.name} (duplicate-skip)`, skipMsg);
+        ai.addToolResult(call.name, skipMsg);
         continue;
       }
       lastToolAction = actionKey;
@@ -205,6 +239,7 @@ export async function runAgentLoop(
         if (page) { await page.close(); page = null; }
         prevNodes = []; refCache = new Map(); needFullSnapshot = true;
         log.result(result.text);
+        logAI(`TOOL_RESULT ${call.name}`, result.text);
         ai.addToolResult(call.name, result.text);
         continue;
       }
@@ -215,12 +250,14 @@ export async function runAgentLoop(
         prevNodes = []; refCache = new Map(); needFullSnapshot = true;
         store.setStatus({ browserOpen: false, browserMode: null });
         log.result(result.text);
+        logAI(`TOOL_RESULT ${call.name}`, result.text);
         ai.addToolResult(call.name, result.text);
         continue;
       }
 
       if (result.isStaleRef) {
         needFullSnapshot = true;
+        logAI(`TOOL_RESULT ${call.name}`, result.text);
         ai.addToolResult(call.name, result.text);
         continue;
       }
@@ -230,8 +267,12 @@ export async function runAgentLoop(
 
       if (call.name === "navigate") needFullSnapshot = true;
 
+      logAI(`TOOL_RESULT ${call.name}`, result.text);
       ai.addToolResult(call.name, result.text);
-      if (result.imageBase64 && supportsVision) ai.addImage(result.imageBase64);
+      if (result.imageBase64 && supportsVision) {
+        logAI(`IMAGE ${call.name}`, `<base64 png, ${result.imageBase64.length} chars>`);
+        ai.addImage(result.imageBase64);
+      }
 
       if (call.name === "done") {
         const lang = result.lang ?? (call.arguments.lang as string | undefined);

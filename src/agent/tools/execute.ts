@@ -6,7 +6,7 @@ import { toMessage } from "@/utils/errors.ts";
 import { navigate as doNavigate, wait as doWait, back as doBack, forward as doForward } from "./navigation.ts";
 import { click, typeText, selectOption, typeAndSelect, scroll, pressKey, hover, drag, evaluate, fill, UnknownRefError } from "./interaction.ts";
 import { solveCaptcha, clickCaptchaTile } from "./captcha.ts";
-import { screenshot, done } from "./capture.ts";
+import { screenshot, done, warn } from "./capture.ts";
 
 type Handler = (page: Page, args: Record<string, unknown>, refCache: RefCache) => Promise<ToolResult>;
 
@@ -21,11 +21,12 @@ const handlers: Record<string, Handler> = {
   forward: (p) => doForward(p),
   scroll: (p, a) => scroll(p, a),
   key: (p, a) => pressKey(p, a),
-  hover: (p, a) => hover(p, a),
-  drag: (p, a) => drag(p, a),
+  hover: (p, a, r) => hover(p, a, r),
+  drag: (p, a, r) => drag(p, a, r),
   evaluate: (p, a) => evaluate(p, a),
   fill: (p, a) => fill(p, a),
   screenshot: (p) => screenshot(p),
+  warn: (p, a) => warn(p, a),
   solveCaptcha: (p) => solveCaptcha(p),
   clickCaptchaTile: (p, a) => clickCaptchaTile(p, a),
   done: (p, a) => done(p, a),

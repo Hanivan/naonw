@@ -30,6 +30,10 @@ export abstract class BaseProvider implements AIClient {
   abstract addImage(base64: string): void;
   abstract clearHistory(): void;
   abstract chat(tools: ToolDefinition[]): Promise<ChatResult>;
+  // Mirror the assistant turn that ANOTHER provider produced. Default: no-op.
+  // Overridden by OAI providers so a fallback target inherits a syntactically
+  // valid history when it later becomes active mid-conversation.
+  mirrorAssistantToolCalls(_content: string | null, _toolCalls: { name: string; arguments: Record<string, unknown> }[]): void {}
   async close(): Promise<void> {}
 
   // Pre-flight check. Return null if usable, otherwise a one-line error string.
@@ -108,6 +112,7 @@ export abstract class OAIProvider extends DirectProvider {
     this.messages = [];
     this.pendingToolCallIds = [];
     this.skipNextAdd = false;
+    this.skipNextMirror = false;
   }
 
   protected trimHistory(): OAIMessage[] {
@@ -121,6 +126,20 @@ export abstract class OAIProvider extends DirectProvider {
     this.messages.push({ role: "assistant", content, tool_calls: toolCalls });
     this.pendingToolCallIds = toolCalls.map((tc) => tc.id);
     this.skipNextAdd = true;
+    this.skipNextMirror = true;
+  }
+
+  protected skipNextMirror = false;
+
+  override mirrorAssistantToolCalls(content: string | null, toolCalls: { name: string; arguments: Record<string, unknown> }[]): void {
+    if (this.skipNextMirror) { this.skipNextMirror = false; return; }
+    const synth: OAIToolCall[] = toolCalls.map((tc, i) => ({
+      id: `mirror_${Date.now()}_${i}`,
+      type: "function" as const,
+      function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+    }));
+    this.messages.push({ role: "assistant", content, tool_calls: synth });
+    this.pendingToolCallIds = synth.map((tc) => tc.id);
   }
 
   protected parseToolCalls(raw: OAIToolCall[]): ChatResult["toolCalls"] {

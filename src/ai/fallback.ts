@@ -17,6 +17,16 @@ function isRateLimit(err: unknown): boolean {
   return msg.includes("rate") || msg.includes("limit") || msg.includes("429") || msg.includes("quota") || msg.includes("too many");
 }
 
+function failureReason(err: unknown): string | null {
+  const msg = toMessage(err).toLowerCase();
+  if (isRateLimit(err)) return "rate limited";
+  if (msg.includes("not found") || msg.includes("404")) return "model unavailable";
+  if (msg.includes("unauthorized") || msg.includes("401") || msg.includes("403") || msg.includes("invalid api key")) return "auth failed";
+  if (msg.includes("503") || msg.includes("502") || msg.includes("server error") || msg.includes("overloaded")) return "server error";
+  if (msg.includes("econnrefused") || msg.includes("etimedout") || msg.includes("network") || msg.includes("fetch failed")) return "network error";
+  return null;
+}
+
 export class FallbackClient extends BaseProvider {
   readonly provider = "fallback";
   // Priority order: openrouter → ollama → opencode
@@ -62,19 +72,29 @@ export class FallbackClient extends BaseProvider {
   }
 
   async chat(tools: ToolDefinition[]): Promise<ChatResult> {
+    let lastErr: unknown;
     for (let i = this.activeIndex; i < this.providers.length; i++) {
       try {
         const result = await this.providers[i]!.chat(tools);
         this.activeIndex = i;
+        if (result.toolCalls.length > 0) {
+          for (const p of this.providers) p.mirrorAssistantToolCalls(result.content, result.toolCalls);
+        }
         return result;
       } catch (err: unknown) {
-        if (!isRateLimit(err) || i === this.providers.length - 1) throw err;
+        lastErr = err;
+        const reason = failureReason(err);
+        const isLast = i === this.providers.length - 1;
+        if (reason === null || isLast) {
+          if (reason && isLast) log.error(`all providers failed — last: ${this.providers[i]!.provider} (${reason}: ${toMessage(err)})`);
+          throw err;
+        }
         const next = this.providers[i + 1]!;
-        log.warn(`${this.providers[i]!.provider} rate limited — switching to ${next.provider}`);
+        log.warn(`${this.providers[i]!.provider} ${reason} — switching to ${next.provider}`);
         this.activeIndex = i + 1;
       }
     }
-    throw new Error("All providers are rate-limited");
+    throw lastErr ?? new Error("All providers exhausted");
   }
 
   override async close(): Promise<void> {

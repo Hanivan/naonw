@@ -60,7 +60,24 @@ interface RawAXNode {
   backendDOMNodeId?: number;
 }
 
+function isContextDestroyed(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return /context was destroyed|Target closed|frame got detached|Session closed/i.test(msg);
+}
+
 export async function takeSnapshot(page: Page): Promise<SnapshotResult> {
+  try {
+    return await snapshotOnce(page);
+  } catch (e) {
+    if (!isContextDestroyed(e)) throw e;
+    // Mid-navigation — let it settle, then retry once.
+    await page.waitForNavigation({ waitUntil: "domcontentloaded", timeout: 10000 }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 200));
+    return await snapshotOnce(page);
+  }
+}
+
+async function snapshotOnce(page: Page): Promise<SnapshotResult> {
   const client = await page.createCDPSession();
   try {
     const { nodes: raw } = await (client as any).send("Accessibility.getFullAXTree", { pierce: true });

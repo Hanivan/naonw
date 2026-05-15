@@ -120,23 +120,26 @@ export const toolDefinitions: ToolDefinition[] = [
   },
   {
     name: "hover",
-    description: "Hover (move mouse) to screen coordinates — useful for triggering dropdown menus",
+    description: "Hover (move mouse) over an element. Prefer ref over coords.",
     parameters: {
       type: "object",
-      required: ["x", "y"],
+      required: [],
       properties: {
-        x: { type: "number" },
-        y: { type: "number" },
+        ref: { type: "string", description: "Element ref from snapshot (preferred)" },
+        x: { type: "number", description: "X coord (only if no ref)" },
+        y: { type: "number", description: "Y coord (only if no ref)" },
       },
     },
   },
   {
     name: "drag",
-    description: "Drag from one coordinate to another",
+    description: "Drag between two elements or coordinates. Prefer fromRef/toRef over coords.",
     parameters: {
       type: "object",
-      required: ["x1", "y1", "x2", "y2"],
+      required: [],
       properties: {
+        fromRef: { type: "string", description: "Source element ref (preferred)" },
+        toRef: { type: "string", description: "Target element ref (preferred)" },
         x1: { type: "number" }, y1: { type: "number" },
         x2: { type: "number" }, y2: { type: "number" },
       },
@@ -187,6 +190,17 @@ export const toolDefinitions: ToolDefinition[] = [
     name: "closeBrowser",
     description: "Close the entire browser instance",
     parameters: { type: "object", required: [], properties: {} },
+  },
+  {
+    name: "warn",
+    description: "Surface a warning to the user without ending the task. Use for: headless browser blocking media playback, paywall encountered, region restriction detected, partial result, anything the user should know but does not stop progress.",
+    parameters: {
+      type: "object",
+      required: ["message"],
+      properties: {
+        message: { type: "string", description: "Short user-facing warning (one sentence)" },
+      },
+    },
   },
   {
     name: "done",

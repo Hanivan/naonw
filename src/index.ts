@@ -188,7 +188,14 @@ try {
     store.setStatus({ promptLabel: "…running" });
     log.agent(displayPrompt);
 
-    const result = await runAgentLoop(browser, headless, ai, currentPrompt, activeController.signal, waitForFollowUp, waitForCaptcha);
+    let result;
+    try {
+      result = await runAgentLoop(browser, headless, ai, currentPrompt, activeController.signal, waitForFollowUp, waitForCaptcha);
+    } catch (err: unknown) {
+      const msg = toMessage(err);
+      log.error(`Agent loop crashed — ${msg}`);
+      result = { success: false, summary: `Crashed: ${msg}` };
+    }
 
     store.setStatus({ agentStatus: result.success ? "done" : "interrupted" });
     const elapsedMs = Date.now() - store.status.agentStartTime;

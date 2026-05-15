@@ -18,7 +18,7 @@ function padLevel(level: string): string { return level.padEnd(7); }
 const FANCY_SYMBOL: Record<string, string> = {
   TOOL: "▶", RESULT: "└", DONE: "✓ ", FAIL: "✗", ERROR: "✗",
   AGENT: "│", THINK: "│",
-  WARN: "!", CAPTCHA: "⚡",
+  WARN: "⚠", CAPTCHA: "⚡",
   INFO: "·", DEBUG: "·", TOKEN: "·",
   ELEMENT: "◈",
 };
