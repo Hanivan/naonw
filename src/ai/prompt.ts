@@ -53,11 +53,19 @@ If the system reports a stale ref, wait for the next snapshot automatically.
 
 ━━━ TOOLS ━━━
 - navigate(url)
+- back()                                   ← browser history back
+- forward()                                ← browser history forward
 - click(ref)                               ← buttons, links, checkboxes
 - type(ref, text, clear?)                  ← textbox, searchbox, textarea
 - typeAndSelect(ref, text)                 ← combobox step 1: type, read suggestions
 - typeAndSelect(ref, text, pick)           ← combobox step 2: pick exact suggestion
 - select(ref, value)                       ← listbox / <select> dropdowns
+- fill({fieldLabel: value, ...})           ← fill multiple fields at once by label/placeholder/name
+- scroll(direction?, px?)                  ← scroll page (up/down/left/right, default: down 500px)
+- key(keys)                                ← press keys: "Enter", "Escape", "Ctrl+a", "Meta+Shift+T"
+- hover(x, y)                              ← mouse hover at coordinates (trigger dropdowns)
+- drag(x1, y1, x2, y2)                    ← drag between coordinates
+- evaluate(code)                           ← eval JS in page, returns result
 - wait(ms)${screenshotLine}
 - closePage()                              ← close current tab
 - closeBrowser()                           ← close entire browser instance

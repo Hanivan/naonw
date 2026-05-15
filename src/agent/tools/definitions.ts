@@ -96,6 +96,89 @@ export const toolDefinitions: ToolDefinition[] = [
     },
   },
   {
+    name: "scroll",
+    description: "Scroll the page",
+    parameters: {
+      type: "object",
+      required: [],
+      properties: {
+        direction: { type: "string", enum: ["up", "down", "left", "right"], description: "Scroll direction (default: down)" },
+        px: { type: "number", description: "Pixels to scroll (default: 500)" },
+      },
+    },
+  },
+  {
+    name: "key",
+    description: "Press one or more keys. Supports combos like Meta+a, Ctrl+Shift+T. Multiple keys space-separated.",
+    parameters: {
+      type: "object",
+      required: ["keys"],
+      properties: {
+        keys: { type: "string", description: "Keys to press, space-separated (e.g. 'Enter' or 'Ctrl+a Ctrl+c')" },
+      },
+    },
+  },
+  {
+    name: "hover",
+    description: "Hover (move mouse) to screen coordinates — useful for triggering dropdown menus",
+    parameters: {
+      type: "object",
+      required: ["x", "y"],
+      properties: {
+        x: { type: "number" },
+        y: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "drag",
+    description: "Drag from one coordinate to another",
+    parameters: {
+      type: "object",
+      required: ["x1", "y1", "x2", "y2"],
+      properties: {
+        x1: { type: "number" }, y1: { type: "number" },
+        x2: { type: "number" }, y2: { type: "number" },
+      },
+    },
+  },
+  {
+    name: "evaluate",
+    description: "Evaluate JavaScript in the page context and return the result",
+    parameters: {
+      type: "object",
+      required: ["code"],
+      properties: {
+        code: { type: "string", description: "JS expression or function body to evaluate" },
+      },
+    },
+  },
+  {
+    name: "fill",
+    description: "Fill multiple form fields at once by label, placeholder, name, aria-label, or CSS selector",
+    parameters: {
+      type: "object",
+      required: ["fields"],
+      properties: {
+        fields: {
+          type: "object",
+          description: "Key-value pairs: field label/name/selector → value",
+          // additionalProperties not in schema type — validated at runtime
+        },
+      },
+    },
+  },
+  {
+    name: "back",
+    description: "Navigate back in browser history",
+    parameters: { type: "object", required: [], properties: {} },
+  },
+  {
+    name: "forward",
+    description: "Navigate forward in browser history",
+    parameters: { type: "object", required: [], properties: {} },
+  },
+  {
     name: "closePage",
     description: "Close the current browser tab/page",
     parameters: { type: "object", required: [], properties: {} },

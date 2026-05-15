@@ -4,7 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "bun src/index.ts"
+    "start": "bun src/index.ts",
+    "pi": "bun src/pi.ts",
+    "build:pi": "bun build src/pi.ts --compile --outfile dist/pi",
+    "install:pi": "bun run build:pi && cp dist/pi ~/.local/bin/pi"
   },
   "devDependencies": {
     "@types/bun": "latest",

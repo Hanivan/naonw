@@ -11,3 +11,13 @@ export async function wait(_page: Page, args: Record<string, unknown>): Promise<
   await Bun.sleep(args.ms as number);
   return { text: `Waited ${args.ms as number}ms` };
 }
+
+export async function back(page: Page): Promise<ToolResult> {
+  await page.goBack({ waitUntil: "load", timeout: 30000 });
+  return { text: `Went back to ${page.url()}` };
+}
+
+export async function forward(page: Page): Promise<ToolResult> {
+  await page.goForward({ waitUntil: "load", timeout: 30000 });
+  return { text: `Went forward to ${page.url()}` };
+}
