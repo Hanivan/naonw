@@ -32,8 +32,9 @@ function truncate(s: string, max: number): string {
 }
 
 export function TaskSidebar({ tasks, selectedIndex, width }: Props) {
-  // width includes 1-col left padding. Reserve: 1 (icon) + 1 (space) + 2 (index "N ") = 4 cols of chrome.
-  const promptWidth = Math.max(4, width - 5);
+  // Chrome per row: paddingX-left (1) + icon (1) + space (1) + digits-of-index + space (1) + paddingX-right (1).
+  const indexDigits = tasks.length === 0 ? 1 : String(tasks.length).length;
+  const promptWidth = Math.max(4, width - 5 - indexDigits);
   return (
     <Box flexDirection="column" width={width} paddingX={1}>
       <Box marginBottom={1}>
