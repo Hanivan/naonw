@@ -5,8 +5,12 @@ import type { LogEntry, Status } from "@/ui/store.ts";
 import { LogPanel } from "@/ui/log-panel.tsx";
 import type { LogPanelRef } from "@/ui/log-panel.tsx";
 import { InputBar } from "@/ui/input-bar.tsx";
-import { StatusLine } from "@/ui/status-line.tsx";
-import { TimerBar } from "@/ui/timer-bar.tsx";
+import { HeaderBar } from "@/ui/header-bar.tsx";
+
+// Header: 2 content rows + 1 bottom border = 3
+// Input:  1 top border + 1 prompt + 1 hint = 3
+const HEADER_H = 3;
+const INPUT_H  = 3;
 
 interface AppProps {
   onSubmit: (text: string) => void;
@@ -29,7 +33,7 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
     return () => { store.off("log", onLog); store.off("status", onStatus); };
   }, []);
 
-  const paneHeight = Math.max(1, rows - 6);
+  const mainHeight = Math.max(1, rows - HEADER_H - INPUT_H);
 
   const handleKey = useCallback(() => {
     logPanelRef.current?.scrollToBottom();
@@ -45,12 +49,11 @@ export function App({ onSubmit, onInterrupt }: AppProps) {
   }, []);
 
   return (
-    <Box flexDirection="column" width="100%" height={rows}>
-      <LogPanel ref={logPanelRef} logs={logs} paneHeight={paneHeight}
+    <Box flexDirection="column" width="100%" height={rows} overflow="hidden">
+      <HeaderBar status={status} />
+      <LogPanel ref={logPanelRef} logs={logs} paneHeight={mainHeight}
                 collapsedGroups={collapsedGroups} onToggleGroup={(id: string) => store.toggleGroup(id)} />
-      <TimerBar status={status} />
       <InputBar onSubmit={onSubmit} onInterrupt={onInterrupt} onKey={handleKey} onToggleGroup={handleToggleLastGroup} />
-      <StatusLine status={status} />
     </Box>
   );
 }

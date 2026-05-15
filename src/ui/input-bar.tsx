@@ -24,27 +24,37 @@ export function InputBar({ onSubmit, onInterrupt, onKey, onToggleGroup }: InputB
   });
 
   return (
-    <Box
-      borderStyle="single"
-      borderTop
-      borderBottom={false}
-      borderLeft={false}
-      borderRight={false}
-      paddingX={1}
-    >
-      <Text color={isFocused ? "cyan" : "gray"} bold>❯ </Text>
-      {isFocused
-        ? (
-          <TextInput
-            value={input}
-            onChange={(val) => { if (!/\[<\d/.test(val)) setInput(val); }}
-            onSubmit={(val) => { const t = val.trim(); setLastInput(t); setInput(""); onSubmit(t); }}
-            showCursor
-            focus={isFocused}
-          />
-        )
-        : <Text color="gray" dimColor>scroll mode  ·  Tab to type</Text>
-      }
+    <Box flexDirection="column">
+      <Box
+        borderStyle="single"
+        borderTop
+        borderBottom={false}
+        borderLeft={false}
+        borderRight={false}
+        paddingX={1}
+      >
+        <Text color={isFocused ? "cyan" : "gray"} bold>❯ </Text>
+        {isFocused
+          ? (
+            <TextInput
+              value={input}
+              onChange={(val) => { if (!/\[<\d/.test(val)) setInput(val); }}
+              onSubmit={(val) => { const t = val.trim(); setLastInput(t); setInput(""); onSubmit(t); }}
+              showCursor
+              focus={isFocused}
+            />
+          )
+          : <Text color="gray" dimColor>scroll mode</Text>
+        }
+      </Box>
+      <Box paddingX={2}>
+        <Text dimColor color="gray">
+          {isFocused
+            ? "Tab: scroll mode  ·  ↑↓ PgUp PgDn: scroll  ·  ctrl+g: collapse  ·  Esc: interrupt"
+            : "j/k: select group  ·  enter: expand/collapse  ·  Tab: type mode  ·  ctrl+g: collapse"
+          }
+        </Text>
+      </Box>
     </Box>
   );
 }

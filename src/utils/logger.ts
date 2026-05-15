@@ -28,9 +28,7 @@ export function initLog(): void {
 export { writeFile as writeLog };
 
 export const log = {
-  brand(msg: string): void {
-    store.pushLog({ level: "BRAND", msg, timestamp: ts() });
-  },
+  brand(_msg: string): void {},
   provider(name: string, model: string, cloud: boolean, keys: number): void {
     const data: ProviderData = { name, model, cloud, keys };
     store.pushLog({ level: "PROVIDER", msg: `${name} ${model}`, timestamp: ts(), data });

@@ -1,5 +1,4 @@
 import { Box, Text } from "ink";
-import figlet from "figlet";
 import type { LogEntry, ProviderData } from "@/ui/store.ts";
 
 const IS_FANCY = process.env.LOG_TYPE !== "old";
@@ -17,7 +16,6 @@ function padLevel(level: string): string { return level.padEnd(7); }
 
 // ── Fancy mode ────────────────────────────────────────────────────────────────
 const FANCY_SYMBOL: Record<string, string> = {
-  BRAND: "◆",
   TOOL: "▶", RESULT: "└", DONE: "✓ ", FAIL: "✗", ERROR: "✗",
   AGENT: "│", THINK: "│",
   WARN: "!", CAPTCHA: "⚡",
@@ -26,7 +24,6 @@ const FANCY_SYMBOL: Record<string, string> = {
 };
 
 const FANCY_COLOR: Record<string, string> = {
-  BRAND: "blueBright",
   TOOL: "cyan", RESULT: "green", DONE: "green",
   FAIL: "red", ERROR: "red",
   AGENT: "yellow", THINK: "magenta",
@@ -37,7 +34,7 @@ const FANCY_COLOR: Record<string, string> = {
 
 const RESULT_INDENT = new Set(["RESULT"]);
 const DIM_LEVELS   = new Set(["INFO", "DEBUG", "TOKEN", "ELEMENT"]);
-const BOLD_LEVELS  = new Set(["BRAND", "DONE", "FAIL", "ERROR", "CAPTCHA"]);
+const BOLD_LEVELS  = new Set(["DONE", "FAIL", "ERROR", "CAPTCHA"]);
 
 function fancyMsg(entry: LogEntry): string {
   if (entry.level === "TOOL") {
@@ -50,16 +47,6 @@ function fancyMsg(entry: LogEntry): string {
     return lines.length > 1 ? `${first} …` : first;
   }
   return entry.msg;
-}
-
-const BRAND_ASCII = figlet.textSync("Naonw", { font: "Slant" });
-
-function BrandEntry() {
-  return (
-    <Box marginBottom={1}>
-      <Text color="blueBright">{BRAND_ASCII}</Text>
-    </Box>
-  );
 }
 
 function FancyEntry({ entry }: { entry: LogEntry }) {
@@ -154,7 +141,6 @@ function renderEntry(entry: LogEntry, key: number) {
       </Box>
     );
   }
-  if (entry.level === "BRAND") return <BrandEntry key={key} />;
   if (entry.level === "PROVIDER") return <ProviderEntry key={key} entry={entry} />;
   return <FancyEntry key={key} entry={entry} />;
 }
@@ -171,7 +157,7 @@ interface LogPaneProps {
 export function LogPane({ items, scrollTop, paneHeight, selectedGroupId, lastGroupId }: LogPaneProps) {
   const visible = items.slice(scrollTop, scrollTop + paneHeight);
   return (
-    <Box height={paneHeight} flexDirection="column">
+    <Box height={paneHeight} flexDirection="column" overflow="hidden">
       {visible.map((item) => {
         if (item.type === "collapsed") {
           return (

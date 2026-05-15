@@ -18,7 +18,6 @@ export type LogLevel =
   | "TOKEN"
   | "DONE"
   | "FAIL"
-  | "BRAND"
   | "PROVIDER";
 
 export type ProviderData = {

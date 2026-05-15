@@ -1,4 +1,4 @@
-import { Box, Text, useInput, useFocus } from "ink";
+import { Box, useInput, useFocus } from "ink";
 import { useRef, useEffect, forwardRef, useImperativeHandle, useState, useMemo } from "react";
 import { LogPane, buildRenderItems } from "@/ui/log-pane.tsx";
 import { useMouseWheel } from "@/utils/use-mouse-wheel.ts";
@@ -44,9 +44,7 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   let lastGroupId: string | null = null;
   for (const e of logs) if (e.groupId) lastGroupId = e.groupId;
 
-  const hintHeight = isFocused && allGroupIds.length > 0 ? 1 : 0;
-  const effectivePaneHeight = Math.max(1, paneHeight - hintHeight);
-  const maxScroll = Math.max(0, items.length - effectivePaneHeight);
+  const maxScroll = Math.max(0, items.length - paneHeight);
 
   // Auto-select last group (any state); preserve selection if group still exists
   useEffect(() => {
@@ -59,9 +57,9 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   // Auto-scroll to bottom when new items arrive and user is pinned to bottom
   useEffect(() => {
     if (atBottomRef.current) {
-      setScrollTop(Math.max(0, items.length - effectivePaneHeight));
+      setScrollTop(Math.max(0, items.length - paneHeight));
     }
-  }, [items.length, effectivePaneHeight]);
+  }, [items.length, paneHeight]);
 
   // Scroll to keep selected group in view after j/k navigation
   useEffect(() => {
@@ -72,17 +70,17 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     if (idx < 0) return;
     setScrollTop((prev) => {
       if (idx < prev) return idx;
-      if (idx >= prev + effectivePaneHeight) return idx - effectivePaneHeight + 1;
+      if (idx >= prev + paneHeight) return idx - paneHeight + 1;
       return prev;
     });
-  }, [selectedGroupId, items, effectivePaneHeight]);
+  }, [selectedGroupId, items, paneHeight]);
 
   useImperativeHandle(ref, () => ({
     scrollToBottom() {
       atBottomRef.current = true;
-      setScrollTop(Math.max(0, items.length - effectivePaneHeight));
+      setScrollTop(Math.max(0, items.length - paneHeight));
     },
-  }), [items.length, effectivePaneHeight]);
+  }), [items.length, paneHeight]);
 
   useMouseWheel({
     onWheelUp: () => {
@@ -107,11 +105,11 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     if (key.end)  { atBottomRef.current = true;  setScrollTop(maxScroll); }
     if (key.upArrow || key.pageUp) {
       atBottomRef.current = false;
-      setScrollTop((p) => Math.max(0, p - (key.upArrow ? 1 : effectivePaneHeight)));
+      setScrollTop((p) => Math.max(0, p - (key.upArrow ? 1 : paneHeight)));
     }
     if (key.downArrow || key.pageDown) {
       setScrollTop((p) => {
-        const n = Math.min(maxScroll, p + (key.downArrow ? 1 : effectivePaneHeight));
+        const n = Math.min(maxScroll, p + (key.downArrow ? 1 : paneHeight));
         if (n >= maxScroll) atBottomRef.current = true;
         return n;
       });
@@ -134,24 +132,15 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     }
   });
 
-  const selectedIsCollapsed = selectedGroupId !== null && collapsedGroups.has(selectedGroupId);
-
   return (
-    <Box flexDirection="column" height={paneHeight}>
+    <Box flexDirection="column" height={paneHeight} overflow="hidden">
       <LogPane
         items={items}
         scrollTop={scrollTop}
-        paneHeight={effectivePaneHeight}
+        paneHeight={paneHeight}
         selectedGroupId={selectedGroupId}
         lastGroupId={lastGroupId}
       />
-      {isFocused && allGroupIds.length > 0 && (
-        <Box paddingX={1}>
-          <Text dimColor color="gray">
-            {`j/k: select group  ·  enter: ${selectedIsCollapsed ? "expand" : "collapse"}`}
-          </Text>
-        </Box>
-      )}
     </Box>
   );
 });
