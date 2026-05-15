@@ -197,6 +197,7 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
         tasks={sidebarTasks}
         selectedIndex={selectedIndex}
         width={SIDEBAR_WIDTH}
+        isFocused={isFocused}
       />
       <TaskContent
         entries={selectedEntries}

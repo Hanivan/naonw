@@ -12,6 +12,7 @@ interface Props {
   tasks: SidebarTask[];
   selectedIndex: number | null;
   width: number;
+  isFocused: boolean;
 }
 
 const STATUS_ICON: Record<TaskStatus, string> = {
@@ -31,14 +32,16 @@ function truncate(s: string, max: number): string {
   return s.slice(0, Math.max(0, max - 1)) + "…";
 }
 
-export function TaskSidebar({ tasks, selectedIndex, width }: Props) {
+export function TaskSidebar({ tasks, selectedIndex, width, isFocused }: Props) {
   // Chrome per row: paddingX-left (1) + icon (1) + space (1) + digits-of-index + space (1) + paddingX-right (1).
   const indexDigits = tasks.length === 0 ? 1 : String(tasks.length).length;
   const promptWidth = Math.max(4, width - 5 - indexDigits);
   return (
     <Box flexDirection="column" width={width} paddingX={1}>
       <Box marginBottom={1}>
-        <Text dimColor>TASKS</Text>
+        <Text color={isFocused ? "cyan" : undefined} bold={isFocused} dimColor={!isFocused}>
+          {isFocused ? "▌TASKS" : " TASKS"}
+        </Text>
       </Box>
       {tasks.length === 0 ? (
         <Text dimColor>(no tasks yet)</Text>
