@@ -1,11 +1,11 @@
-// pi — puppeteer-ai browser CLI
-// Usage: bun src/pi.ts <command> [args] [flags]
+// naonw — Naonw browser CLI
+// Usage: bun src/naonw.ts <command> [args] [flags]
 import puppeteer from "puppeteer-core";
 import type { Page, KeyInput } from "puppeteer-core";
 import { parseArgs } from "node:util";
 import { writeFileSync } from "node:fs";
 
-const CDP_URL = process.env.PI_CDP_URL ?? "http://127.0.0.1:9222";
+const CDP_URL = process.env.NAONW_CDP_URL ?? "http://127.0.0.1:9222";
 const VIEWPORT = { width: 1024, height: 768 };
 
 // ── Flags ────────────────────────────────────────────────────────────────────
@@ -66,7 +66,7 @@ async function connect(tabId?: string): Promise<{ page: Page; close: () => Promi
 
 async function cmdGo(args: string[], flags: Flags) {
   const url = args[0];
-  if (!url) throw new Error("Usage: pi go <url>");
+  if (!url) throw new Error("Usage: naonw go <url>");
   const { page, close } = await connect(flags.tab);
   await page.goto(url, { waitUntil: "networkidle0", timeout: flags.timeout });
   console.log(page.url());
@@ -166,7 +166,7 @@ async function cmdSnap(_args: string[], flags: Flags) {
 
 async function cmdClick(args: string[], flags: Flags) {
   const [xs, ys] = args;
-  if (!xs || !ys) throw new Error("Usage: pi click <x> <y>");
+  if (!xs || !ys) throw new Error("Usage: naonw click <x> <y>");
   const x = Number(xs); const y = Number(ys);
   const { page, close } = await connect(flags.tab);
   const btn = flags.right ? "right" : "left";
@@ -176,7 +176,7 @@ async function cmdClick(args: string[], flags: Flags) {
 }
 
 async function cmdType(args: string[], flags: Flags) {
-  if (args.length === 0) throw new Error("Usage: pi type [x y] <text>");
+  if (args.length === 0) throw new Error("Usage: naonw type [x y] <text>");
   let text: string;
   let x: number | undefined; let y: number | undefined;
   if (args.length >= 3 && !isNaN(Number(args[0])) && !isNaN(Number(args[1]))) {
@@ -193,7 +193,7 @@ async function cmdType(args: string[], flags: Flags) {
 }
 
 async function cmdFill(args: string[], flags: Flags) {
-  if (args.length === 0) throw new Error('Usage: pi fill "Label=value" ...');
+  if (args.length === 0) throw new Error('Usage: naonw fill "Label=value" ...');
   const fields: Record<string, string> = {};
   for (const arg of args) {
     const eq = arg.indexOf("=");
@@ -240,7 +240,7 @@ async function cmdFill(args: string[], flags: Flags) {
 }
 
 async function cmdKey(args: string[], flags: Flags) {
-  if (args.length === 0) throw new Error("Usage: pi key <key...>");
+  if (args.length === 0) throw new Error("Usage: naonw key <key...>");
   const { page, close } = await connect(flags.tab);
   for (const k of args) {
     if (!k.includes("+")) { await page.keyboard.press(k as KeyInput); continue; }
@@ -256,14 +256,14 @@ async function cmdKey(args: string[], flags: Flags) {
 
 async function cmdMove(args: string[], flags: Flags) {
   const [xs, ys] = args;
-  if (!xs || !ys) throw new Error("Usage: pi move <x> <y>");
+  if (!xs || !ys) throw new Error("Usage: naonw move <x> <y>");
   const { page, close } = await connect(flags.tab);
   await page.mouse.move(Number(xs), Number(ys));
   await close();
 }
 
 async function cmdDrag(args: string[], flags: Flags) {
-  if (args.length < 4) throw new Error("Usage: pi drag <x1> <y1> <x2> <y2>");
+  if (args.length < 4) throw new Error("Usage: naonw drag <x1> <y1> <x2> <y2>");
   const [x1, y1, x2, y2] = args.map(Number);
   const { page, close } = await connect(flags.tab);
   await page.mouse.move(x1!, y1!);
@@ -286,7 +286,7 @@ async function cmdScroll(args: string[], flags: Flags) {
 
 async function cmdJs(args: string[], flags: Flags) {
   const code = args.join(" ");
-  if (!code.trim()) throw new Error("Usage: pi js <code>");
+  if (!code.trim()) throw new Error("Usage: naonw js <code>");
   const { page, close } = await connect(flags.tab);
   const result = await page.evaluate(code);
   await close();
@@ -296,7 +296,7 @@ async function cmdJs(args: string[], flags: Flags) {
 
 async function cmdWait(args: string[], flags: Flags) {
   const target = args[0];
-  if (!target) throw new Error("Usage: pi wait <ms | selector | networkidle | url:pattern>");
+  if (!target) throw new Error("Usage: naonw wait <ms | selector | networkidle | url:pattern>");
   const { page, close } = await connect(flags.tab);
   const ms = Number(target);
   if (!isNaN(ms) && String(ms) === target) {
@@ -314,7 +314,7 @@ async function cmdWait(args: string[], flags: Flags) {
 async function cmdTab(args: string[], flags: Flags) {
   const [sub, ...rest] = args;
   if (!sub || !["list", "new", "close"].includes(sub)) {
-    throw new Error("Usage: pi tab <list|new [url]|close [id]>");
+    throw new Error("Usage: naonw tab <list|new [url]|close [id]>");
   }
   const browser = await puppeteer.connect({ browserURL: CDP_URL, defaultViewport: VIEWPORT });
   const pages = browser.targets().filter(t => t.type() === "page");
@@ -358,10 +358,10 @@ async function cmdTab(args: string[], flags: Flags) {
 
 // ── Dispatch ─────────────────────────────────────────────────────────────────
 
-const HELP = `pi — puppeteer-ai browser CLI
+const HELP = `naonw — Naonw browser CLI
 
-Usage: pi <command> [args] [flags]
-       PI_CDP_URL=http://localhost:9222 (default)
+Usage: naonw <command> [args] [flags]
+       NAONW_CDP_URL=http://localhost:9222 (default)
 
 Navigation:
   go <url>                    Navigate (waits for networkidle)
@@ -413,7 +413,7 @@ async function main() {
   if (!cmd || flags.help) { console.log(HELP); process.exit(0); }
 
   const handler = commands[cmd];
-  if (!handler) throw new Error(`Unknown command: ${cmd}\nRun 'pi --help' for usage`);
+  if (!handler) throw new Error(`Unknown command: ${cmd}\nRun 'naonw --help' for usage`);
 
   await handler(rest, flags);
 }

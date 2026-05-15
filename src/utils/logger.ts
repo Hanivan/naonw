@@ -21,7 +21,7 @@ function writeFile(level: string, msg: string): void {
 
 export function initLog(): void {
   try {
-    writeFileSync(LOG_FILE, `=== puppeteer-ai ${new Date().toISOString()} ===\n`);
+    writeFileSync(LOG_FILE, `=== Naonw ${new Date().toISOString()} ===\n`);
   } catch {}
 }
 

@@ -1,6 +1,6 @@
-# puppeteer-ai
+# Naonw
 
-AI-powered browser automation agent. Give it a task in plain English — it controls a real browser to complete it. Also ships `pi`, a human-facing browser CLI for direct interaction.
+AI-powered browser automation agent. Give it a task in plain English — it controls a real browser to complete it. Also ships `naonw`, a human-facing browser CLI for direct interaction.
 
 ## Setup
 
@@ -83,9 +83,9 @@ bun src/index.ts "what is the prayer schedule in Bogor today"
 
 ---
 
-## `pi` — Browser CLI
+## `naonw` — Browser CLI
 
-`pi` lets you control a browser directly from the terminal — no AI involved. Useful for scripting, debugging, or quick interactions.
+`naonw` lets you control a browser directly from the terminal — no AI involved. Useful for scripting, debugging, or quick interactions.
 
 ### Requirements
 
@@ -95,10 +95,10 @@ Chrome must be running with remote debugging enabled on port 9222:
 google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-debug
 ```
 
-Override the default CDP URL with `PI_CDP_URL`:
+Override the default CDP URL with `NAONW_CDP_URL`:
 
 ```bash
-PI_CDP_URL=http://localhost:9999 bun run pi snap
+NAONW_CDP_URL=http://localhost:9999 bun run naonw snap
 ```
 
 ### Install
@@ -106,8 +106,8 @@ PI_CDP_URL=http://localhost:9999 bun run pi snap
 Build a standalone binary and add it to your PATH:
 
 ```bash
-bun run build:pi          # compiles → dist/pi
-bun run install:pi        # build + copies to ~/.local/bin/pi
+bun run build:naonw          # compiles → dist/naonw
+bun run install:naonw        # build + copies to ~/.local/bin/naonw
 ```
 
 Make sure `~/.local/bin` is in `$PATH`:
@@ -120,7 +120,7 @@ source ~/.bashrc
 Or run without installing:
 
 ```bash
-bun run pi <command> [args]
+bun run naonw <command> [args]
 ```
 
 ### Commands
@@ -128,64 +128,64 @@ bun run pi <command> [args]
 #### Navigation
 
 ```bash
-pi go https://example.com        # navigate (waits for networkidle)
-pi url                            # print current URL
-pi back                           # go back
-pi forward                        # go forward
+naonw go https://example.com        # navigate (waits for networkidle)
+naonw url                            # print current URL
+naonw back                           # go back
+naonw forward                        # go forward
 ```
 
 #### Observe
 
 ```bash
-pi text                           # visible text of <body>
-pi text "h1"                      # visible text of a CSS selector
-pi shot                           # screenshot → ./shot.png
-pi shot /tmp/page.png             # screenshot to custom path
-pi shot --width 1440 --height 900 # screenshot at custom viewport size
-pi snap                           # interactive elements via Accessibility Tree
-pi snap --json                    # snap output as JSON
+naonw text                           # visible text of <body>
+naonw text "h1"                      # visible text of a CSS selector
+naonw shot                           # screenshot → ./shot.png
+naonw shot /tmp/page.png             # screenshot to custom path
+naonw shot --width 1440 --height 900 # screenshot at custom viewport size
+naonw snap                           # interactive elements via Accessibility Tree
+naonw snap --json                    # snap output as JSON
 ```
 
 #### Interact
 
 ```bash
-pi click 400 300                  # click at coordinates
-pi click 400 300 --right          # right-click
-pi click 400 300 --double         # double-click
-pi type "hello world"             # type text at current focus
-pi type 400 300 "hello"           # triple-click at coords, then type
-pi fill "Email=me@example.com" "Name=Jo"   # fill form fields by label/placeholder/name
-pi key Enter                      # press a key
-pi key Escape
-pi key "Ctrl+a" "Ctrl+c"          # key combos, space-separated
-pi move 400 300                   # hover at coordinates
-pi drag 100 200 400 200           # drag from (100,200) to (400,200)
-pi scroll                         # scroll down 500px
-pi scroll up
-pi scroll down 1000
-pi scroll left 300
+naonw click 400 300                  # click at coordinates
+naonw click 400 300 --right          # right-click
+naonw click 400 300 --double         # double-click
+naonw type "hello world"             # type text at current focus
+naonw type 400 300 "hello"           # triple-click at coords, then type
+naonw fill "Email=me@example.com" "Name=Jo"   # fill form fields by label/placeholder/name
+naonw key Enter                      # press a key
+naonw key Escape
+naonw key "Ctrl+a" "Ctrl+c"          # key combos, space-separated
+naonw move 400 300                   # hover at coordinates
+naonw drag 100 200 400 200           # drag from (100,200) to (400,200)
+naonw scroll                         # scroll down 500px
+naonw scroll up
+naonw scroll down 1000
+naonw scroll left 300
 ```
 
 #### Tabs
 
 ```bash
-pi tab list                       # list open tabs (id, url, title)
-pi tab list --json
-pi tab new                        # open a new blank tab, prints id
-pi tab new https://example.com    # open a new tab at URL
-pi tab close                      # close last opened tab
-pi tab close <id>                 # close tab by id
+naonw tab list                       # list open tabs (id, url, title)
+naonw tab list --json
+naonw tab new                        # open a new blank tab, prints id
+naonw tab new https://example.com    # open a new tab at URL
+naonw tab close                      # close last opened tab
+naonw tab close <id>                 # close tab by id
 ```
 
 #### Other
 
 ```bash
-pi js "document.title"            # eval JS, prints result
-pi js "window.scrollY"
-pi wait 2000                      # wait 2 seconds
-pi wait "#submit-btn"             # wait for selector to appear
-pi wait networkidle               # wait for network to settle
-pi wait "url:dashboard"           # wait until URL contains "dashboard"
+naonw js "document.title"            # eval JS, prints result
+naonw js "window.scrollY"
+naonw wait 2000                      # wait 2 seconds
+naonw wait "#submit-btn"             # wait for selector to appear
+naonw wait networkidle               # wait for network to settle
+naonw wait "url:dashboard"           # wait until URL contains "dashboard"
 ```
 
 ### Flags
@@ -204,30 +204,30 @@ pi wait "url:dashboard"           # wait until URL contains "dashboard"
 
 ```bash
 # Open a page and grab its title
-pi go https://news.ycombinator.com
-pi js "document.title"
+naonw go https://news.ycombinator.com
+naonw js "document.title"
 
 # Fill and submit a login form
-pi fill "Email=user@example.com" "Password=hunter2"
-pi key Enter
+naonw fill "Email=user@example.com" "Password=hunter2"
+naonw key Enter
 
 # Scroll to bottom, screenshot
-pi scroll down 9999
-pi shot bottom.png
+naonw scroll down 9999
+naonw shot bottom.png
 
 # List all open tabs and target one
-pi tab list
-pi snap --tab <id>
+naonw tab list
+naonw snap --tab <id>
 
 # Search on Google — page auto-focuses the input, so type works directly
-pi go https://www.google.com
-pi type "bun"
-pi key Enter
+naonw go https://www.google.com
+naonw type "bun"
+naonw key Enter
 
 # If the input is NOT auto-focused, use snap to find its coordinates first
-pi go https://www.google.com
-pi snap
+naonw go https://www.google.com
+naonw snap
 # [4] searchbox "Search" (512, 300)   ← read x,y from output
-pi type 512 300 "bun"                 # triple-clicks at (512,300) to focus, then types
-pi key Enter
+naonw type 512 300 "bun"                 # triple-clicks at (512,300) to focus, then types
+naonw key Enter
 ```

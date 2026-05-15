@@ -52,7 +52,7 @@ function fancyMsg(entry: LogEntry): string {
   return entry.msg;
 }
 
-const BRAND_ASCII = figlet.textSync("puppeteer-ai", { font: "Slant" });
+const BRAND_ASCII = figlet.textSync("Naonw", { font: "Slant" });
 
 function BrandEntry() {
   return (

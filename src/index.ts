@@ -81,7 +81,7 @@ process.on("unhandledRejection", (reason) => {
 
 // ── Boot status ───────────────────────────────────────────
 store.setStatus({ supportsVision, supportsThinking });
-log.brand("puppeteer-ai");
+log.brand("Naonw");
 if (openrouterKeys?.length) {
   log.provider("openrouter", process.env.OPENROUTER_MODEL ?? "openrouter/owl-alpha", false, openrouterKeys.length);
 }

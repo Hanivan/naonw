@@ -1,13 +1,13 @@
 {
-  "name": "puppeteer-ai",
+  "name": "naonw",
   "module": "src/index.ts",
   "type": "module",
   "private": true,
   "scripts": {
     "start": "bun src/index.ts",
-    "pi": "bun src/pi.ts",
-    "build:pi": "bun build src/pi.ts --compile --outfile dist/pi",
-    "install:pi": "bun run build:pi && cp dist/pi ~/.local/bin/pi"
+    "naonw": "bun src/naonw.ts",
+    "build:naonw": "bun build src/naonw.ts --compile --outfile dist/naonw",
+    "install:naonw": "bun run build:naonw && cp dist/naonw ~/.local/bin/naonw"
   },
   "devDependencies": {
     "@types/bun": "latest",
