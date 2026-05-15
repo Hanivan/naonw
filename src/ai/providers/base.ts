@@ -31,6 +31,10 @@ export abstract class BaseProvider implements AIClient {
   abstract clearHistory(): void;
   abstract chat(tools: ToolDefinition[]): Promise<ChatResult>;
   async close(): Promise<void> {}
+
+  // Pre-flight check. Return null if usable, otherwise a one-line error string.
+  // Default: assume usable (override in subclasses that can verify).
+  async validate(): Promise<string | null> { return null; }
 }
 
 // ── Tier 2: single-endpoint providers — adds API key rotation ────────────────
