@@ -32,6 +32,7 @@ export async function runAgentLoop(
   userPrompt: string,
   signal?: AbortSignal,
   waitForInput?: () => Promise<string>,
+  waitForCaptcha?: () => Promise<void>,
 ): Promise<AgentResult> {
   let currentHeadless = headless;
   let page: Page | null = browser.isLaunched() ? browser.getPage() : null;
@@ -96,7 +97,8 @@ export async function runAgentLoop(
           needFullSnapshot = true;
         }
         log.captcha("Solve it in the browser, then press Enter to continue...");
-        if (waitForInput) await waitForInput();
+        if (waitForCaptcha) await waitForCaptcha();
+        else if (waitForInput) await waitForInput();
         else await waitForEnter();
         if (!browser.isCdp() && currentHeadless !== headless) {
           log.captcha(`Switching back to ${headless ? "headless" : "visible"}...`);

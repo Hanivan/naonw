@@ -33,6 +33,11 @@ export type LogEntry = {
   groupId?: string;
 };
 
+export type QueuedMessage = {
+  id: string;
+  prompt: string;
+};
+
 export type AgentStatus = "idle" | "thinking" | "tool" | "done" | "interrupted";
 
 export type Status = {
@@ -73,6 +78,40 @@ class Store extends EventEmitter {
   logs: LogEntry[] = [];
   status: Status = { ...DEFAULT_STATUS };
   providers: ProviderData[] = [];
+  queue: QueuedMessage[] = [];
+  captchaPending = false;
+
+  setCaptchaPending(value: boolean): void {
+    if (this.captchaPending === value) return;
+    this.captchaPending = value;
+    this.emit("captcha");
+  }
+
+  private _queueCounter = 0;
+
+  enqueue(prompt: string): QueuedMessage {
+    this._queueCounter += 1;
+    const item: QueuedMessage = { id: `q${this._queueCounter}`, prompt };
+    this.queue = [...this.queue, item];
+    this.emit("queue");
+    return item;
+  }
+
+  dequeue(): QueuedMessage | undefined {
+    if (this.queue.length === 0) return undefined;
+    const [head, ...rest] = this.queue;
+    this.queue = rest;
+    this.emit("queue");
+    return head;
+  }
+
+  removeQueued(id: string): void {
+    const next = this.queue.filter((q) => q.id !== id);
+    if (next.length === this.queue.length) return;
+    this.queue = next;
+    this.emit("queue");
+  }
+
   pushLog(entry: LogEntry): void {
     this.logs.push(entry);
     if (this.logs.length > MAX_LOGS) this.logs.splice(0, this.logs.length - MAX_LOGS);

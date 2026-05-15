@@ -30,23 +30,54 @@ const ollamaKeys = parseKeys(process.env.OLLAMA_API_KEY);
 const opencodeKeys = parseKeys(process.env.OPENCODE_API_KEY);
 const openrouterKeys = parseKeys(process.env.OPENROUTER_API_KEY);
 
-// ── Input channel ─────────────────────────────────────────
-// Bridges InputBar (React) → async agent loop (outside React)
-let inputResolve: ((val: string) => void) | null = null;
-function waitForInput(): Promise<string> {
-  return new Promise((resolve) => { inputResolve = resolve; });
+// ── Input channels ────────────────────────────────────────
+// Two independent waiters: follow-up (between tasks) and captcha (mid-task).
+// handleSubmit routes user input based on which waiter is active and the captcha flag.
+let followUpResolve: ((val: string) => void) | null = null;
+let captchaResolve: (() => void) | null = null;
+
+function waitForFollowUp(): Promise<string> {
+  return new Promise((resolve) => { followUpResolve = resolve; });
 }
+
+function waitForCaptcha(): Promise<void> {
+  store.setCaptchaPending(true);
+  return new Promise((resolve) => {
+    captchaResolve = () => {
+      store.setCaptchaPending(false);
+      resolve();
+    };
+  });
+}
+
 function handleSubmit(text: string): void {
-  inputResolve?.(text);
-  inputResolve = null;
+  if (store.captchaPending) {
+    if (text === "") {
+      const r = captchaResolve;
+      captchaResolve = null;
+      r?.();
+    } else {
+      store.enqueue(text);
+    }
+    return;
+  }
+  if (followUpResolve) {
+    const r = followUpResolve;
+    followUpResolve = null;
+    r(text);
+    return;
+  }
+  store.enqueue(text);
 }
 
 // ── Interrupt ─────────────────────────────────────────────
 let activeController = new AbortController();
 function handleInterrupt(): void {
-  // log.warn("ESC — stopping...");
   activeController.abort();
-  if (inputResolve) { inputResolve(""); inputResolve = null; }
+  // Resolve any pending waiter with empty string so the loop unblocks.
+  if (followUpResolve) { const r = followUpResolve; followUpResolve = null; r(""); }
+  if (captchaResolve) { const r = captchaResolve; captchaResolve = null; r(); }
+  else if (store.captchaPending) store.setCaptchaPending(false);
 }
 
 // ── Browser + AI ──────────────────────────────────────────
@@ -136,19 +167,20 @@ async function isYouTubePlaying(): Promise<boolean> {
 }
 
 try {
-  // Get initial task
-  let initialPrompt = process.argv.slice(2).join(" ").trim();
-  if (!initialPrompt) {
-    store.setStatus({ promptLabel: "Task" });
-    initialPrompt = await waitForInput();
-    if (!initialPrompt) {
-      log.error("No task provided. Exiting.");
-      process.exit(1);
+  // Get initial task: CLI arg, then queue, then wait for user.
+  let displayPrompt = process.argv.slice(2).join(" ").trim();
+  if (!displayPrompt) {
+    const fromQueue = store.dequeue();
+    if (fromQueue) {
+      displayPrompt = fromQueue.prompt;
+    } else {
+      store.setStatus({ promptLabel: "Task" });
+      displayPrompt = await waitForFollowUp();
+      while (!displayPrompt) displayPrompt = await waitForFollowUp();
     }
   }
 
-  let currentPrompt = initialPrompt;
-  let displayPrompt = initialPrompt;
+  let currentPrompt = displayPrompt;
   let lastSummary = "";
 
   while (true) {
@@ -156,7 +188,7 @@ try {
     store.setStatus({ promptLabel: "…running" });
     log.agent(displayPrompt);
 
-    const result = await runAgentLoop(browser, headless, ai, currentPrompt, activeController.signal, waitForInput);
+    const result = await runAgentLoop(browser, headless, ai, currentPrompt, activeController.signal, waitForFollowUp, waitForCaptcha);
 
     store.setStatus({ agentStatus: result.success ? "done" : "interrupted" });
     const elapsedMs = Date.now() - store.status.agentStartTime;
@@ -181,14 +213,21 @@ try {
       log.info("YouTube video playing — browser stays open.");
     }
 
-    store.setStatus({ promptLabel: "Follow-up (Ctrl+C to exit)" });
-    let followUp = "";
-    while (!followUp) followUp = await waitForInput();
+    // Pick next prompt: queue first, then user input.
+    const fromQueue = store.dequeue();
+    let next: string;
+    if (fromQueue) {
+      next = fromQueue.prompt;
+    } else {
+      store.setStatus({ promptLabel: "Follow-up (Ctrl+C to exit)" });
+      next = await waitForFollowUp();
+      while (!next) next = await waitForFollowUp();
+    }
 
-    displayPrompt = followUp;
+    displayPrompt = next;
     currentPrompt = lastSummary
-      ? `Previous task result:\n${lastSummary}\n\nFollow-up: ${followUp}`
-      : followUp;
+      ? `Previous task result:\n${lastSummary}\n\nFollow-up: ${next}`
+      : next;
   }
 } catch (err: unknown) {
   log.error(toMessage(err));

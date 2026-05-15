@@ -3,7 +3,8 @@ import { useRef, useEffect, forwardRef, useImperativeHandle, useState, useMemo }
 import { TaskSidebar } from "@/ui/task-sidebar.tsx";
 import { TaskContent } from "@/ui/task-content.tsx";
 import { useMouseWheel } from "@/utils/use-mouse-wheel.ts";
-import type { LogEntry } from "@/ui/store.ts";
+import type { LogEntry, QueuedMessage } from "@/ui/store.ts";
+import { store } from "@/ui/store.ts";
 
 const SIDEBAR_WIDTH = 22;
 
@@ -14,6 +15,7 @@ export interface LogPanelRef {
 interface LogPanelProps {
   logs: LogEntry[];
   paneHeight: number;
+  queued: QueuedMessage[];
 }
 
 type TaskInfo = {
@@ -51,7 +53,7 @@ function deriveTasks(logs: LogEntry[]): TaskInfo[] {
 }
 
 export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel(
-  { logs, paneHeight },
+  { logs, paneHeight, queued },
   ref,
 ) {
   const { isFocused } = useFocus({ id: "log" });
@@ -69,6 +71,12 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   tasksRef.current = tasks;
   const selectedIndexRef = useRef(selectedIndex);
   selectedIndexRef.current = selectedIndex;
+
+  const [selectedQueueId, setSelectedQueueId] = useState<string | null>(null);
+  const queuedRef = useRef(queued);
+  queuedRef.current = queued;
+  const selectedQueueIdRef = useRef(selectedQueueId);
+  selectedQueueIdRef.current = selectedQueueId;
   const lastIndex = tasks.length === 0 ? null : tasks[tasks.length - 1]!.index;
   const liveIndex = tasks.length > 0 && tasks[tasks.length - 1]!.status === "running"
     ? tasks[tasks.length - 1]!.index
@@ -76,14 +84,16 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
 
   // Initial select + auto-switch when on previous LIVE
   useEffect(() => {
-    if (selectedIndex === null && lastIndex !== null) {
+    if (selectedIndex === null && selectedQueueId === null && lastIndex !== null) {
       setSelectedIndex(lastIndex);
+      setSelectedQueueId(null);
       atBottomRef.current = true;
       setScrollOffset(0);
     } else if (lastIndex !== null && lastIndex !== prevLastIndexRef.current) {
       // A new task was added. Follow if user was on the previously-LIVE task.
       if (selectedIndex === prevLiveIndexRef.current) {
         setSelectedIndex(lastIndex);
+        setSelectedQueueId(null);
         atBottomRef.current = true;
         setScrollOffset(0);
       }
@@ -91,7 +101,7 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     prevLastIndexRef.current = lastIndex;
     // Only remember non-null liveIndex so prevLive points at the LAST task to ever be LIVE.
     if (liveIndex !== null) prevLiveIndexRef.current = liveIndex;
-  }, [lastIndex, liveIndex, selectedIndex]);
+  }, [lastIndex, liveIndex, selectedIndex, selectedQueueId]);
 
   const selectedTask = useMemo(
     () => (selectedIndex === null ? null : tasks.find((t) => t.index === selectedIndex) ?? null),
@@ -99,6 +109,11 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
   );
   const selectedEntries = selectedTask?.entries ?? [];
   const isLive = selectedTask !== null && selectedTask.index === liveIndex;
+
+  const queuedPrompt = useMemo(
+    () => (selectedQueueId === null ? null : queued.find((q) => q.id === selectedQueueId)?.prompt ?? null),
+    [queued, selectedQueueId],
+  );
 
   // Auto-scroll: when new entries arrive on the LIVE task and user is pinned, reset offset.
   useEffect(() => {
@@ -137,25 +152,64 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     if (!isFocusedRef.current) return;
 
     const curTasks = tasksRef.current;
-    const curSelected = selectedIndexRef.current;
+    const curQueued = queuedRef.current;
+    const curSelectedIndex = selectedIndexRef.current;
+    const curSelectedQueueId = selectedQueueIdRef.current;
 
-    // Task navigation: j/k
-    if (char === "j" && curTasks.length > 0) {
-      const curIdx = curSelected ?? curTasks[0]!.index;
-      const pos = curTasks.findIndex((t) => t.index === curIdx);
-      const next = curTasks[(pos + 1) % curTasks.length]!.index;
+    // Combined sequence: [task1, task2, ..., q1, q2, ...]
+    type Slot = { kind: "task"; index: number } | { kind: "queue"; id: string };
+    const slots: Slot[] = [
+      ...curTasks.map((t): Slot => ({ kind: "task", index: t.index })),
+      ...curQueued.map((q): Slot => ({ kind: "queue", id: q.id })),
+    ];
+
+    function findCurrentPos(): number {
+      if (curSelectedQueueId !== null) {
+        const i = slots.findIndex((s) => s.kind === "queue" && s.id === curSelectedQueueId);
+        if (i >= 0) return i;
+      }
+      if (curSelectedIndex !== null) {
+        const i = slots.findIndex((s) => s.kind === "task" && s.index === curSelectedIndex);
+        if (i >= 0) return i;
+      }
+      return -1;
+    }
+
+    function applySlot(slot: Slot): void {
       atBottomRef.current = true;
       setScrollOffset(0);
-      setSelectedIndex(next);
+      if (slot.kind === "task") {
+        setSelectedIndex(slot.index);
+        setSelectedQueueId(null);
+      } else {
+        setSelectedIndex(null);
+        setSelectedQueueId(slot.id);
+      }
+    }
+
+    if (char === "j" && slots.length > 0) {
+      const pos = findCurrentPos();
+      const next = slots[((pos < 0 ? -1 : pos) + 1 + slots.length) % slots.length]!;
+      applySlot(next);
       return;
     }
-    if (char === "k" && curTasks.length > 0) {
-      const curIdx = curSelected ?? curTasks[0]!.index;
-      const pos = curTasks.findIndex((t) => t.index === curIdx);
-      const prev = curTasks[(pos - 1 + curTasks.length) % curTasks.length]!.index;
-      atBottomRef.current = true;
-      setScrollOffset(0);
-      setSelectedIndex(prev);
+    if (char === "k" && slots.length > 0) {
+      const pos = findCurrentPos();
+      const prev = slots[((pos < 0 ? slots.length : pos) - 1 + slots.length) % slots.length]!;
+      applySlot(prev);
+      return;
+    }
+    if ((char === "d" || key.delete) && curSelectedQueueId !== null) {
+      const removedIdx = slots.findIndex((s) => s.kind === "queue" && s.id === curSelectedQueueId);
+      store.removeQueued(curSelectedQueueId);
+      const nextSlots = slots.filter((_s, i) => i !== removedIdx);
+      if (nextSlots.length === 0) {
+        setSelectedIndex(null);
+        setSelectedQueueId(null);
+      } else {
+        const target = nextSlots[Math.min(removedIdx, nextSlots.length - 1)]!;
+        applySlot(target);
+      }
       return;
     }
 
@@ -202,7 +256,9 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
     <Box flexDirection="row" height={paneHeight} width="100%">
       <TaskSidebar
         tasks={sidebarTasks}
+        queued={queued}
         selectedIndex={selectedIndex}
+        selectedQueueId={selectedQueueId}
         width={SIDEBAR_WIDTH}
         isFocused={isFocused}
       />
@@ -212,6 +268,8 @@ export const LogPanel = forwardRef<LogPanelRef, LogPanelProps>(function LogPanel
         paneHeight={paneHeight}
         isLive={isLive}
         taskIndex={selectedIndex}
+        queuedPrompt={queuedPrompt}
+        queuedId={selectedQueueId}
       />
     </Box>
   );
