@@ -79,12 +79,12 @@ class Store extends EventEmitter {
     this.emit("log");
   }
 
-  appendStream(chunk: string): void {
+  appendStream(chunk: string, groupId?: string): void {
     const last = this.logs[this.logs.length - 1];
     if (last && (last.level === "THINK" || last.level === "AGENT")) {
       this.logs[this.logs.length - 1] = { ...last, msg: last.msg + chunk };
     } else {
-      this.logs.push({ level: "AGENT", msg: chunk, timestamp: ts() });
+      this.logs.push({ level: "AGENT", msg: chunk, timestamp: ts(), groupId });
     }
     this.emit("log");
   }

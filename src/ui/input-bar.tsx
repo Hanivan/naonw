@@ -48,8 +48,8 @@ export function InputBar({ onSubmit, onInterrupt, onKey }: InputBarProps) {
       <Box paddingX={2}>
         <Text dimColor color="gray">
           {isFocused
-            ? "Tab: scroll mode  ·  ↑↓ PgUp PgDn: scroll  ·  ctrl+g: collapse  ·  Esc: interrupt"
-            : "j/k: select group  ·  enter: expand/collapse  ·  Tab: type mode  ·  ctrl+g: collapse"
+            ? "Tab: scroll mode  ·  Esc: interrupt"
+            : "j/k: select task  ·  ↑↓ PgUp PgDn Home End: scroll  ·  Tab: type mode"
           }
         </Text>
       </Box>

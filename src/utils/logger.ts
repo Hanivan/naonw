@@ -82,7 +82,7 @@ export const log = {
     }
   },
   stream(chunk: string): void {
-    store.appendStream(chunk);
+    store.appendStream(chunk, activeGroupId ?? undefined);
   },
   token(pin: number, pout: number): void {
     store.setStatus({
