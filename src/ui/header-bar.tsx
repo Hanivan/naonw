@@ -101,11 +101,11 @@ export function HeaderBar({ status, providers }: HeaderBarProps) {
           <Text color="gray" dimColor>· idle</Text>
         )}
         <Text color="gray" dimColor>iter <Text color="magenta">{status.iteration}</Text>/{status.maxIterations}</Text>
-        <Text color="gray" dimColor>
-          <Text color="blue">↑{status.tokensIn}</Text>{" "}
+        <Box gap={1}>
+          <Text color="blue">↑{status.tokensIn}</Text>
           <Text color="green">↓{status.tokensOut}</Text>
-          {" "}Σ{totalTokens}
-        </Text>
+          <Text color="gray">Σ{totalTokens}</Text>
+        </Box>
       </Box>
     </Box>
   );
