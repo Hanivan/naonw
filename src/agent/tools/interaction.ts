@@ -278,8 +278,24 @@ export async function fill(page: Page, args: Record<string, unknown>): Promise<T
   return { text: `Filled: ${results.filled.join(", ")}` };
 }
 
-const AUTOCOMPLETE_SKIP = ["loadingindicator", "masukkan sendiri", "enter address manually", "cannot find"];
-const AUTOCOMPLETE_SEL = '[role="option"], [data-autocomplete-item]';
+const AUTOCOMPLETE_SKIP = [
+  "loadingindicator", "loading…", "loading...", "memuat",
+  "masukkan sendiri", "enter address manually", "cannot find",
+  "tidak dapat menemukan", "tidak ada hasil", "no results",
+];
+const AUTOCOMPLETE_SEL = [
+  '[role="option"]',
+  '[data-autocomplete-item]',
+  '[data-suggestion-index]',                  // Google Maps
+  '[role="listbox"] > li',
+  '[role="listbox"] > div',
+  '[role="grid"] [role="row"]',               // Google Maps grid-style
+  '.suggestion, .autocomplete-item, .typeahead-result, .ac-item',
+  'li[aria-selected]',
+  'ul[id*="suggestion" i] > li',
+  'ul[id*="autocomplete" i] > li',
+  'div[id*="suggestion" i] > div',
+].join(", ");
 
 export async function typeAndSelect(page: Page, args: Record<string, unknown>, refCache: RefCache): Promise<ToolResult> {
   const ref = args.ref as string;
@@ -323,10 +339,49 @@ export async function typeAndSelect(page: Page, args: Record<string, unknown>, r
     );
 
     if (!pick) {
-      const hint = suggestions.length ? `Suggestions: ${suggestions.slice(0, 5).join(" | ")}` : "No suggestions appeared";
+      let finalSuggestions = suggestions;
+      if (suggestions.length === 0) {
+        // No suggestions — maybe debounce ate it, query is too specific, or it's not a combobox.
+        // Wait once more (slow networks) and retry.
+        await Bun.sleep(1500);
+        finalSuggestions = await page.evaluate(
+          (sel: string, skip: string[]) =>
+            Array.from(document.querySelectorAll(sel))
+              .map((el) => {
+                const label = el.getAttribute("aria-label") ?? "";
+                const txt = (el.textContent ?? "").replace(/\s+/g, " ").trim();
+                return label || txt;
+              })
+              .filter((t) => {
+                const lc = t.toLowerCase();
+                return t.length > 0 && !skip.some((s: string) => lc.includes(s));
+              }),
+          AUTOCOMPLETE_SEL,
+          AUTOCOMPLETE_SKIP,
+        );
+      }
+      if (finalSuggestions.length === 0) {
+        // Diagnose: is the field even a combobox?
+        const diag = await page.evaluate((sel: string) => {
+          const ae = document.activeElement as HTMLInputElement | null;
+          const role = ae?.getAttribute("role") ?? "";
+          const ariaAC = ae?.getAttribute("aria-autocomplete") ?? "";
+          const ariaCtrl = ae?.getAttribute("aria-controls") ?? "";
+          const totalListItems = document.querySelectorAll(sel).length;
+          return { role, ariaAC, ariaCtrl, totalListItems, value: ae?.value ?? "" };
+        }, AUTOCOMPLETE_SEL);
+        const isLikelyCombobox = diag.ariaAC === "list" || diag.role === "combobox" || !!diag.ariaCtrl;
+        const advice = isLikelyCombobox
+          ? `try a SHORTER prefix (e.g. "${text.slice(0, 4)}") or wait longer — page may still be loading`
+          : `field may NOT be a combobox (aria-autocomplete="${diag.ariaAC}", role="${diag.role}") — use plain type() instead`;
+        return {
+          text: `Typed "${text}" into ${ref}. No suggestions appeared. Diagnostics: ${JSON.stringify(diag)}. Advice: ${advice}`,
+          displayText: `Typed "${ellipsizeText(text, 40)}" into ${ref} — 0 suggestions (${isLikelyCombobox ? "combobox idle" : "not a combobox"})`,
+        };
+      }
       return {
-        text: `Typed "${text}" into ${ref}. ${hint}`,
-        displayText: `Typed "${ellipsizeText(text, 40)}" into ${ref} — ${suggestions.length} suggestion${suggestions.length !== 1 ? "s" : ""}`,
+        text: `Typed "${text}" into ${ref}. Suggestions: ${finalSuggestions.slice(0, 5).join(" | ")}`,
+        displayText: `Typed "${ellipsizeText(text, 40)}" into ${ref} — ${finalSuggestions.length} suggestion${finalSuggestions.length !== 1 ? "s" : ""}`,
       };
     }
 
@@ -347,7 +402,24 @@ export async function typeAndSelect(page: Page, args: Record<string, unknown>, r
           .filter((x): x is { el: Element; text: string; score: number } => x !== null && x.score > 0)
           .sort((a, b) => b.score - a.score);
         if (!scored.length) return null;
-        (scored[0]!.el as HTMLElement).click();
+        // Walk up to a clickable ancestor (jsaction/role=option/data-suggestion-index)
+        // so frameworks like Angular/Google's jsaction receive the click on the right node.
+        let target: HTMLElement = scored[0]!.el as HTMLElement;
+        for (let cur: HTMLElement | null = target; cur; cur = cur.parentElement) {
+          if (
+            cur.hasAttribute("jsaction") ||
+            cur.getAttribute("role") === "option" ||
+            cur.hasAttribute("data-suggestion-index") ||
+            cur.hasAttribute("data-autocomplete-item")
+          ) { target = cur; break; }
+        }
+        // Fire pointerdown/mouseup/click sequence — some frameworks listen on mousedown not click
+        const rect = target.getBoundingClientRect();
+        const opts = { bubbles: true, cancelable: true, view: window, clientX: rect.left + rect.width/2, clientY: rect.top + rect.height/2 };
+        target.dispatchEvent(new MouseEvent("mousedown", opts));
+        target.dispatchEvent(new MouseEvent("mouseup", opts));
+        target.dispatchEvent(new MouseEvent("click", opts));
+        target.click?.();
         return scored[0]!.text.slice(0, 100);
       },
       AUTOCOMPLETE_SEL,

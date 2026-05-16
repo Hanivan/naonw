@@ -51,7 +51,7 @@ const HINTS: Hint[] = [
   },
   {
     match: (u) => /(maps\.google|google\.com\/maps)/i.test(u),
-    urlSuffix: "[MAPS] Search box is a combobox — typeAndSelect to pick a result. Place names not exact-matched will navigate wrong location.",
+    urlSuffix: "[MAPS] Search box is a role=combobox with role=grid suggestions (data-suggestion-index). typeAndSelect required. Don't type fragments — type whole place name.",
   },
 ];
 
