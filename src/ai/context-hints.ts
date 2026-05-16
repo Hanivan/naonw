@@ -41,6 +41,18 @@ const HINTS: Hint[] = [
     match: (u) => /\/captcha|recaptcha|hcaptcha|cloudflare/i.test(u),
     urlSuffix: "[CAP] CAPTCHA/CHALLENGE — use solveCaptcha() or wait(3000) for Cloudflare.",
   },
+  {
+    match: (u) => /fedex\.com/i.test(u),
+    urlSuffix: "[FEDEX] Address fields (Dari/Kepada, From/To) are Angular comboboxes — MUST use typeAndSelect (2 steps), NEVER plain type. Suggestions render in role=listbox.",
+  },
+  {
+    match: (u) => /(traveloka|tiket\.com|tiket-com|agoda|booking\.com|trivago)/i.test(u),
+    urlSuffix: "[BOOKING] Origin/destination inputs are comboboxes — typeAndSelect 2 steps. Read suggestion list, pick exact match.",
+  },
+  {
+    match: (u) => /(maps\.google|google\.com\/maps)/i.test(u),
+    urlSuffix: "[MAPS] Search box is a combobox — typeAndSelect to pick a result. Place names not exact-matched will navigate wrong location.",
+  },
 ];
 
 export interface ContextHint {

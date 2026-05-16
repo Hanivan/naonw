@@ -288,7 +288,7 @@ export async function runAgentLoop(
         continue;
       }
 
-      if (call.name !== "done") log.result(result.text);
+      if (call.name !== "done") log.result(result.displayText ?? result.text);
       if (PROGRESS_ACTIONS.has(call.name) && !result.text.startsWith("Error")) madeProgress = true;
 
       if (call.name === "navigate") needFullSnapshot = true;

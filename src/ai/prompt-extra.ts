@@ -32,6 +32,12 @@ const BUILTIN_RULES = `━━━ ANTI-PATTERNS (learned from failure) ━━━
 ━━━ MULTI-TASK FOLLOW-UP ━━━
 - Each new TASK message in this conversation is a NEW user request. Treat the previous done()'s summary as historical context only — execute the new task fresh.
 - Do not re-do the previous task. Read the new TASK literally.
+
+━━━ COMBOBOX DETECTION (avoid wrong matches) ━━━
+- ANY input whose label/placeholder/aria-label hints at: address, location, city, country, airport, station, port, kota, alamat, asal, tujuan, lokasi, from/to/dari/kepada → treat as COMBOBOX. Use typeAndSelect, not type.
+- ANY input adjacent (within 2 nodes) to a role=listbox/combobox or has aria-autocomplete="list" → COMBOBOX. typeAndSelect.
+- Plain type() on these fields LOOKS like success but the form rejects on submit because the value isn't bound to a picked suggestion. Always typeAndSelect.
+- If you typed and submitted but got "complete address entry" / "harap lengkapi entri" / "select from list" errors → that field was a combobox you mistyped. Re-do with typeAndSelect.
 `;
 
 const RULES_FILE = process.env.NAONW_RULES_FILE ?? ".config/naonw-rules.md";

@@ -11,7 +11,10 @@ export async function warn(_page: Page, args: Record<string, unknown>): Promise<
   const msg = (args.message as string | undefined)?.trim() ?? "";
   if (!msg) return { text: "warn() requires a non-empty message" };
   log.warn(`[agent] ${msg}`);
-  return { text: `Warning surfaced to user: ${msg}` };
+  return {
+    text: `Warning surfaced to user: ${msg}`,
+    displayText: `warn → ${msg.length > 80 ? msg.slice(0, 80) + "…" : msg}`,
+  };
 }
 
 export async function done(_page: Page, args: Record<string, unknown>): Promise<ToolResult> {

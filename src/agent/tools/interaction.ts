@@ -18,6 +18,10 @@ function getBackendNodeId(ref: string, refCache: RefCache): number {
   return id;
 }
 
+function ellipsizeText(s: string, max = 60): string {
+  return s.length <= max ? s : s.slice(0, max - 1) + "…";
+}
+
 /**
  * Resolve a node by backendNodeId, scroll into view, return its viewport-clamped center.
  * If still off-viewport after scroll, returns null → caller should use synthetic DOM action.
@@ -39,7 +43,7 @@ async function resolveCenter(
 
 export async function click(page: Page, args: Record<string, unknown>, refCache: RefCache): Promise<ToolResult> {
   const ref = args.ref as string;
-  const backendNodeId = await getBackendNodeId(ref, refCache);
+  const backendNodeId = getBackendNodeId(ref, refCache);
   const client = await page.createCDPSession();
   try {
     // Bring element into the viewport — without this, off-screen elements
@@ -86,7 +90,7 @@ export async function typeText(page: Page, args: Record<string, unknown>, refCac
   const ref = args.ref as string;
   const text = args.text as string;
   const clear = args.clear as boolean | undefined;
-  const backendNodeId = await getBackendNodeId(ref, refCache);
+  const backendNodeId = getBackendNodeId(ref, refCache);
   const client = await page.createCDPSession();
   try {
     await (client as any).send("DOM.scrollIntoViewIfNeeded", { backendNodeId }).catch(() => {});
@@ -109,7 +113,10 @@ export async function typeText(page: Page, args: Record<string, unknown>, refCac
       }
     }
     await page.keyboard.type(text, { delay: 50 });
-    return { text: `Typed "${text}" into ${ref}` };
+    return {
+      text: `Typed "${text}" into ${ref}`,
+      displayText: `Typed "${ellipsizeText(text, 60)}" into ${ref}`,
+    };
   } finally {
     await (client as any).detach().catch(() => {});
   }
@@ -118,7 +125,7 @@ export async function typeText(page: Page, args: Record<string, unknown>, refCac
 export async function selectOption(page: Page, args: Record<string, unknown>, refCache: RefCache): Promise<ToolResult> {
   const ref = args.ref as string;
   const value = args.value as string;
-  const backendNodeId = await getBackendNodeId(ref, refCache);
+  const backendNodeId = getBackendNodeId(ref, refCache);
   const client = await page.createCDPSession();
   try {
     await (client as any).send("DOM.scrollIntoViewIfNeeded", { backendNodeId }).catch(() => {});
@@ -225,15 +232,29 @@ function safeStringify(v: unknown): string {
   catch { return String(v); }
 }
 
+function summarizeForLog(v: unknown, raw: string): string {
+  if (v === null || v === undefined) return "null";
+  if (Array.isArray(v)) return `array (${v.length} item${v.length !== 1 ? "s" : ""}, ${raw.length} chars)`;
+  if (typeof v === "object") {
+    const keys = Object.keys(v as Record<string, unknown>);
+    return `object (${keys.length} key${keys.length !== 1 ? "s" : ""}, ${raw.length} chars)`;
+  }
+  if (typeof v === "string") {
+    return v.length > 200 ? `string (${v.length} chars): ${v.slice(0, 200)}…` : v;
+  }
+  return String(v);
+}
+
 export async function evaluate(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
   const code = args.code as string;
   const result = await Promise.race([
     evaluateJs(page, code),
     new Promise((_, rej) => setTimeout(() => rej(new Error("evaluate() timed out after 5s")), 5000)),
   ]);
-  if (result === undefined || result === null) return { text: "null" };
+  if (result === undefined || result === null) return { text: "null", displayText: "null" };
   const out = safeStringify(result);
-  return { text: out.length > 4000 ? out.slice(0, 4000) + " …(truncated)" : out };
+  const text = out.length > 4000 ? out.slice(0, 4000) + " …(truncated)" : out;
+  return { text, displayText: summarizeForLog(result, out) };
 }
 
 export async function fill(page: Page, args: Record<string, unknown>): Promise<ToolResult> {
@@ -264,7 +285,7 @@ export async function typeAndSelect(page: Page, args: Record<string, unknown>, r
   const ref = args.ref as string;
   const text = args.text as string;
   const pick = args.pick as string | undefined;
-  const backendNodeId = await getBackendNodeId(ref, refCache);
+  const backendNodeId = getBackendNodeId(ref, refCache);
   const client = await page.createCDPSession();
   try {
     await (client as any).send("DOM.scrollIntoViewIfNeeded", { backendNodeId }).catch(() => {});
@@ -303,7 +324,10 @@ export async function typeAndSelect(page: Page, args: Record<string, unknown>, r
 
     if (!pick) {
       const hint = suggestions.length ? `Suggestions: ${suggestions.slice(0, 5).join(" | ")}` : "No suggestions appeared";
-      return { text: `Typed "${text}" into ${ref}. ${hint}` };
+      return {
+        text: `Typed "${text}" into ${ref}. ${hint}`,
+        displayText: `Typed "${ellipsizeText(text, 40)}" into ${ref} — ${suggestions.length} suggestion${suggestions.length !== 1 ? "s" : ""}`,
+      };
     }
 
     const picked: string | null = await page.evaluate(
@@ -335,7 +359,10 @@ export async function typeAndSelect(page: Page, args: Record<string, unknown>, r
       const available = suggestions.slice(0, 5).join(" | ");
       throw new Error(`Suggestion matching "${pick}" not found. Available: ${available || "none"}`);
     }
-    return { text: `Typed "${text}" and selected "${picked}"` };
+    return {
+      text: `Typed "${text}" and selected "${picked}"`,
+      displayText: `Typed "${ellipsizeText(text, 40)}" + picked "${ellipsizeText(picked, 40)}"`,
+    };
   } finally {
     await (client as any).detach().catch(() => {});
   }

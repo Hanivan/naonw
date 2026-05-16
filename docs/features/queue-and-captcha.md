@@ -19,10 +19,20 @@ CAPTCHA prompts always preempt the queue — the agent pauses and the input bar 
 
 If you type text into the input bar during captcha mode, it goes to the queue (does NOT resolve the captcha). Only an empty Enter advances past the captcha.
 
+## Focus model
+
+Tab cycles 3 focusable panels: **TASKS** (sidebar) → **LOG** (live content) → **INPUT** (text bar).
+
+| Panel | Focus cue | Keys |
+|---|---|---|
+| TASKS | `▌TASKS` cyan/bold | `j`/`↓` next slot, `k`/`↑` prev, `d` delete queued |
+| LOG | `▌─── task N ───` cyan/bold | `j`/`↓` 1 line down, `k`/`↑` 1 up, `PgUp`/`PgDn`, `g` top, `G` bottom, mouse wheel |
+| INPUT | text cursor | typing |
+
 The input-bar hint changes to reflect mode:
-- Idle: `Tab: scroll mode  ·  Esc: interrupt`
+- Idle (input focused): `Tab: panels  ·  Esc: interrupt`
+- Idle (panels focused): `Tab: cycle panels  ·  TASKS: j/k select, d delete  ·  LOG: j/k scroll, g/G top/bottom, PgUp/Dn`
 - Captcha: `Enter (empty): resolve captcha  ·  text+Enter: queue task  ·  Esc: abort`
-- Queued nav: `j/k: select task  ·  d: delete queued  ·  ↑↓ PgUp PgDn Home End: scroll  ·  Tab: type mode`
 
 ## Storage
 

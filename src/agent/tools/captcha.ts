@@ -13,6 +13,7 @@ export async function solveCaptcha(page: Page): Promise<ToolResult> {
   const imageBase64 = await page.screenshot({ encoding: "base64" });
   return {
     text: `CAPTCHA challenge: "${challengeText}". Grid is 4×4 (IDs 0–15, left-to-right top-to-bottom). Call clickCaptchaTile with IDs of matching tiles, then verify=true when done.`,
+    displayText: challengeText ? `CAPTCHA: "${challengeText}"` : "CAPTCHA (no challenge text)",
     imageBase64,
   };
 }

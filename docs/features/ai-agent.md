@@ -46,8 +46,8 @@ bun src/index.ts "what is the prayer schedule in Bogor today"
 | `screenshot()` | Capture page and send to AI (requires `VISION=true`) |
 | `solveCaptcha()` | Capture and describe a reCAPTCHA challenge |
 | `clickCaptchaTile(ids, verify?)` | Click reCAPTCHA tiles by index |
-| `closePage()` | Close current tab |
-| `closeBrowser()` | Close the browser |
+| `closePage()` | Close current tab; on CDP, automatically adopts another open tab if any |
+| `closeBrowser()` | Force-close the browser (yes, also on CDP — actually exits Chrome) |
 | `warn(message)` | Surface a non-fatal warning to the user, then keep going |
 | `done(summary, lang)` | Finish with a summary (`lang`: `"en"` or `"id"`) |
 

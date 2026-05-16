@@ -35,3 +35,13 @@ Built on CloakBrowser. Optional env vars:
 Page snapshots are taken via the Chrome DevTools `Accessibility.getFullAXTree` protocol. If a snapshot throws `Execution context was destroyed` (mid-navigation), the snapshot is retried once after waiting for `domcontentloaded`. Same handling for `Target closed` and `frame got detached`.
 
 `pressKey` similarly recovers from nav-induced context loss — Enter that triggers navigation now reports success after waiting for the page to settle, instead of surfacing as an error to the AI.
+
+## Close semantics
+
+| Caller | CDP-attached | Launched-stealth |
+|---|---|---|
+| Agent calls `closeBrowser()` | Closes all pages, then `Browser.close` CDP method → Chrome actually exits | `browser.close()` — Chromium process terminates |
+| Agent calls `closePage()` | `page.close({runBeforeUnload:false})`, then adopts another open tab if any | Same; if last tab, no replacement |
+| App exits (Ctrl+C / finally) | `browser.disconnect()` only — your Chrome stays alive | `browser.close()` — Chromium terminates |
+
+The "agent closes browser via tool" path is forceful. The "app shutdown" path is gentle — never kills your manually-managed Chrome on quit.

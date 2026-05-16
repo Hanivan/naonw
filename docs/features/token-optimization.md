@@ -35,6 +35,12 @@ Override the always-extra layer by creating a file at `NAONW_RULES_FILE` (defaul
 
 Add new labels by editing `src/ai/prompt-conditional.ts` — each entry is `{ label, match: (task) => boolean, rules: string }`.
 
+### Always-on extra rules
+
+`src/ai/prompt-extra.ts` ships a small always-loaded block (~2 KB) with hard-earned anti-patterns: duplicate-click detection, state discipline ("old refs are dead"), done() format discipline, multi-task follow-up handling, and **combobox detection** (labels like address/lokasi/asal/tujuan/from/to/dari/kepada → use `typeAndSelect`, not plain `type`).
+
+Override the entire block by creating a file at `NAONW_RULES_FILE` (default: `.config/naonw-rules.md`).
+
 ## System budget per task type
 
 vs. naive ~11.6 KB monolithic prompt:
@@ -68,6 +74,9 @@ Combined effect: **~60-70% smaller snapshots** on content-heavy pages compared t
 | `checkout`/`payment`/`billing` | `[$$] CHECKOUT — read prices, do NOT submit/pay.` |
 | `youtube.com/channel`/`@<handle>` (not /watch) | `[YT-CH] click 'Videos'/'Live' tab; do not guess subpath URLs.` |
 | `captcha`/`recaptcha`/`hcaptcha`/`cloudflare` | `[CAP] CAPTCHA — solveCaptcha() flow or wait(3000) for Cloudflare.` |
+| `fedex.com` | `[FEDEX] Address fields (Dari/Kepada, From/To) are Angular comboboxes — MUST use typeAndSelect.` |
+| `traveloka`, `tiket.com`, `agoda`, `booking.com`, `trivago` | `[BOOKING] Origin/destination inputs are comboboxes — typeAndSelect 2 steps.` |
+| `maps.google` / `google.com/maps` | `[MAPS] Search box is a combobox — typeAndSelect to pick a result.` |
 
 Each hint ~50-80 chars. Most snapshots get 0 or 1 hint, costing ~15 tokens per match. Add new hints by editing `HINTS[]` in `context-hints.ts`.
 

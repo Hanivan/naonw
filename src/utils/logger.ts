@@ -15,6 +15,24 @@ export function timestamp(): string {
   return ts();
 }
 
+/** Compact a tool's args object for the TUI: strings >80 chars become "<N chars>". */
+function shortenArgs(args: Record<string, unknown>, maxStr = 80): string {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(args)) {
+    if (typeof v === "string" && v.length > maxStr) {
+      out[k] = `<${v.length} chars>`;
+    } else if (Array.isArray(v) && v.length > 20) {
+      out[k] = `<array of ${v.length}>`;
+    } else if (v && typeof v === "object" && !Array.isArray(v)) {
+      const s = JSON.stringify(v);
+      out[k] = s.length > maxStr ? `<object ${s.length} chars>` : v;
+    } else {
+      out[k] = v;
+    }
+  }
+  return JSON.stringify(out);
+}
+
 function writeFile(level: string, msg: string): void {
   try {
     appendFileSync(LOG_FILE, `${ts()} [${level.padEnd(7)}] ${msg}\n`);
@@ -54,12 +72,19 @@ export const log = {
     writeFile("INFO", msg);
   },
   tool(name: string, args: Record<string, unknown>, provider?: string, tag?: string): void {
-    const argsStr = Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
     const provStr = provider ? `[${provider}] ` : "";
     const tagStr = tag ? ` ${tag}` : "";
-    const msg = `${provStr}${name}${tagStr}${argsStr}`;
-    store.pushLog({ level: "TOOL", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
-    writeFile("TOOL", msg);
+    // File log: full args, no truncation
+    const argsFull = Object.keys(args).length ? ` ${JSON.stringify(args)}` : "";
+    writeFile("TOOL", `${provStr}${name}${tagStr}${argsFull}`);
+    // TUI log: shorten any long string field to keep the panel scannable
+    const argsShort = Object.keys(args).length ? ` ${shortenArgs(args)}` : "";
+    store.pushLog({
+      level: "TOOL",
+      msg: `${provStr}${name}${tagStr}${argsShort}`,
+      timestamp: ts(),
+      groupId: activeGroupId ?? undefined,
+    });
   },
   result(msg: string): void {
     store.pushLog({ level: "RESULT", msg, timestamp: ts(), groupId: activeGroupId ?? undefined });
